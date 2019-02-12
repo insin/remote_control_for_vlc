@@ -135,7 +135,7 @@ class _RemoteControlState extends State<RemoteControl> {
                 children: <Widget>[
                   Text(
                     title,
-                    style: Theme.of(context).textTheme.headline,
+                    style: Theme.of(context).textTheme.title,
                     textAlign: TextAlign.center,
                   )
                 ],
@@ -143,55 +143,60 @@ class _RemoteControlState extends State<RemoteControl> {
             ]),
             Expanded(
               child: Padding(
-                  padding: EdgeInsets.all(16),
+                  padding: EdgeInsets.all(32),
                   child: Image.asset('assets/vlc-icon.png')),
             ),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text(
-                state != 'stopped' ? _formatTime(time) : '––:––',
-              ),
-              Flexible(
-                  flex: 1,
-                  child: Slider(
-                    divisions: 100,
-                    max: state != 'stopped' ? 100 : 0,
-                    value: _sliderValue(),
-                    onChangeStart: (percent) {
-                      setState(() {
-                        sliding = true;
-                      });
-                    },
-                    onChanged: (percent) {
-                      setState(() {
-                        time = Duration(
-                            seconds:
-                                (length.inSeconds / 100 * percent).round());
-                      });
-                    },
-                    onChangeEnd: (percent) async {
-                      await _seek(percent.round());
-                      setState(() {
-                        sliding = false;
-                      });
-                    },
-                  )),
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    showTimeLeft = !showTimeLeft;
-                  });
-                },
-                child: Text(
-                  state != 'stopped'
-                      ? showTimeLeft
-                          ? '-' + _formatTime(length - time)
-                          : _formatTime(length)
-                      : '––:––',
-                ),
-              ),
-            ]),
-            ButtonBar(
-              alignment: MainAxisAlignment.spaceEvenly,
+            Container(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      state != 'stopped' ? _formatTime(time) : '––:––',
+                    ),
+                    Flexible(
+                        flex: 1,
+                        child: Slider(
+                          divisions: 100,
+                          max: state != 'stopped' ? 100 : 0,
+                          value: _sliderValue(),
+                          onChangeStart: (percent) {
+                            setState(() {
+                              sliding = true;
+                            });
+                          },
+                          onChanged: (percent) {
+                            setState(() {
+                              time = Duration(
+                                  seconds: (length.inSeconds / 100 * percent)
+                                      .round());
+                            });
+                          },
+                          onChangeEnd: (percent) async {
+                            await _seek(percent.round());
+                            setState(() {
+                              sliding = false;
+                            });
+                          },
+                        )),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          showTimeLeft = !showTimeLeft;
+                        });
+                      },
+                      child: Text(
+                        state != 'stopped'
+                            ? showTimeLeft
+                                ? '-' + _formatTime(length - time)
+                                : _formatTime(length)
+                            : '––:––',
+                      ),
+                    ),
+                  ],
+                )),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
                 CircleButton(
                   state == 'paused' || state == 'stopped'
@@ -234,7 +239,7 @@ class CircleButton extends StatelessWidget {
       shape: new CircleBorder(),
       elevation: 1.0,
       fillColor: Theme.of(context).primaryColor,
-      padding: const EdgeInsets.all(15.0),
+      padding: EdgeInsets.all(10),
     );
   }
 }
