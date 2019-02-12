@@ -1,18 +1,33 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
 
-import 'browser.dart';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'file_browser.dart';
 import 'models.dart';
 
 var fileSystemItem = BrowseItem('dir', 'File System', '', 'file:///');
 var homeFolderItem = BrowseItem('dir', 'Home', '', 'file://~');
 
-class FilePicker extends StatefulWidget {
+class OpenMedia extends StatefulWidget {
+  final SharedPreferences prefs;
+
+  OpenMedia({@required this.prefs});
+
   @override
-  State<StatefulWidget> createState() => _FilePickerState();
+  State<StatefulWidget> createState() => _OpenMediaState();
 }
 
-class _FilePickerState extends State<FilePicker> {
-  List<BrowseItem> _faves = [];
+class _OpenMediaState extends State<OpenMedia> {
+  List<BrowseItem> _faves;
+
+  @override
+  initState() {
+    _faves = (jsonDecode(widget.prefs.getString('faves') ?? '[]') as List)
+        .map((obj) => BrowseItem.fromJson(obj))
+        .toList();
+    super.initState();
+  }
 
   bool _isFave(BrowseItem item) {
     return _faves.any((fave) => item.path == fave.path);
@@ -26,39 +41,39 @@ class _FilePickerState extends State<FilePicker> {
       } else {
         _faves.add(item);
       }
+      widget.prefs.setString('faves', jsonEncode(_faves));
     });
+  }
+
+  _selectFile(BrowseItem dir) async {
+    BrowseItem selectedFile = await Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (context) => FileBrowser(
+                dir: dir,
+                isFave: _isFave,
+                onToggleFave: _toggleFave,
+              )),
+    );
+    if (selectedFile != null) {
+      Navigator.pop(context, selectedFile);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    List<Widget> listItems = [
+    List<Widget> listItems = <Widget>[
       ListTile(
           title: Text('File System'),
           leading: Icon(Icons.folder),
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (context) => Browser(
-                        dir: fileSystemItem,
-                        isFave: _isFave,
-                        onToggleFave: _toggleFave,
-                      )),
-            );
+            _selectFile(fileSystemItem);
           }),
       ListTile(
           title: Text('Home Folder'),
           leading: Icon(Icons.home),
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (context) => Browser(
-                        dir: homeFolderItem,
-                        isFave: _isFave,
-                        onToggleFave: _toggleFave,
-                      )),
-            );
+            _selectFile(homeFolderItem);
           }),
     ];
 
@@ -76,14 +91,7 @@ class _FilePickerState extends State<FilePicker> {
                 title: Text(item.name),
                 leading: Icon(Icons.folder_special),
                 onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => Browser(
-                            dir: item,
-                            isFave: _isFave,
-                            onToggleFave: _toggleFave)),
-                  );
+                  _selectFile(item);
                 }),
             onDismissed: (direction) {
               _toggleFave(item);

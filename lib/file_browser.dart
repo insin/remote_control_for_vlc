@@ -6,21 +6,20 @@ import 'package:xml/xml.dart' as xml;
 
 import 'models.dart';
 
-class Browser extends StatefulWidget {
+class FileBrowser extends StatefulWidget {
   final BrowseItem dir;
   final bool Function(BrowseItem) isFave;
   final Function(BrowseItem) onToggleFave;
 
-  Browser(
+  FileBrowser(
       {@required this.dir, @required this.isFave, @required this.onToggleFave});
 
   @override
-  State<StatefulWidget> createState() => _BrowserState();
+  State<StatefulWidget> createState() => _FileBrowserState();
 }
 
-class _BrowserState extends State<Browser> {
+class _FileBrowserState extends State<FileBrowser> {
   bool _loading = false;
-  String _host = '10.0.2.2:8080';
   List<BrowseItem> _items = [];
 
   @override
@@ -34,7 +33,8 @@ class _BrowserState extends State<Browser> {
       _loading = true;
     });
 
-    http.get(Uri.http(_host, '/requests/browse.xml', {'uri': dir.uri}),
+    http.get(
+        Uri.http('10.0.2.2:8080', '/requests/browse.xml', {'uri': dir.uri}),
         headers: {
           'Authorization': 'Basic ' + base64Encode(utf8.encode(':vlcplayer'))
         }).then((http.Response response) {
@@ -66,19 +66,22 @@ class _BrowserState extends State<Browser> {
     });
   }
 
-  _handleTap(BrowseItem item) {
+  _handleTap(BrowseItem item) async {
     if (item.type == 'dir') {
-      Navigator.push(
+      BrowseItem selectedFile = await Navigator.push(
         context,
         MaterialPageRoute(
-            builder: (context) => Browser(
+            builder: (context) => FileBrowser(
                   dir: item,
                   isFave: widget.isFave,
                   onToggleFave: widget.onToggleFave,
                 )),
       );
+      if (selectedFile != null) {
+        Navigator.pop(context, selectedFile);
+      }
     } else {
-      print('Selected ${item.path}');
+      Navigator.pop(context, item);
     }
   }
 
@@ -120,7 +123,9 @@ class _BrowserState extends State<Browser> {
     return ListView(
         children: _items
             .map((item) => ListTile(
-                  leading: item.type == 'dir' ? Icon(Icons.folder) : null,
+                  leading: item.type == 'dir'
+                      ? Icon(Icons.folder)
+                      : Icon(Icons.insert_drive_file),
                   title: Text(item.name),
                   enabled: !_loading,
                   onTap: () {
