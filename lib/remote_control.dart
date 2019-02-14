@@ -27,8 +27,8 @@ class RemoteControl extends StatefulWidget {
 class _RemoteControlState extends State<RemoteControl> {
   String state = 'stopped';
   String title = '';
-  Duration time = new Duration(seconds: 0);
-  Duration length = new Duration(seconds: 0);
+  Duration time = Duration.zero;
+  Duration length = Duration.zero;
 
   Timer ticker;
   bool showTimeLeft = false;
@@ -86,10 +86,21 @@ class _RemoteControlState extends State<RemoteControl> {
     }
   }
 
-  _seek(int percent) async {
+  _seekPercent(int percent) async {
     var document = await _statusRequest({
       'command': 'seek',
       'val': '$percent%',
+    });
+    setState(() {
+      time = Duration(
+          seconds: int.tryParse(document.findAllElements('time').first.text));
+    });
+  }
+
+  _seekRelative(int seekTime) async {
+    var document = await _statusRequest({
+      'command': 'seek',
+      'val': '''${seekTime > 0 ? '+' : ''}${seekTime}S''',
     });
     setState(() {
       time = Duration(
@@ -173,7 +184,7 @@ class _RemoteControlState extends State<RemoteControl> {
                             });
                           },
                           onChangeEnd: (percent) async {
-                            await _seek(percent.round());
+                            await _seekPercent(percent.round());
                             setState(() {
                               sliding = false;
                             });
@@ -199,6 +210,12 @@ class _RemoteControlState extends State<RemoteControl> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
                 CircleButton(
+                  Icons.fast_rewind,
+                  onPressed: () {
+                    _seekRelative(-10);
+                  },
+                ),
+                CircleButton(
                   state == 'paused' || state == 'stopped'
                       ? Icons.play_arrow
                       : Icons.pause,
@@ -207,6 +224,12 @@ class _RemoteControlState extends State<RemoteControl> {
                 CircleButton(
                   Icons.stop,
                   onPressed: _stop,
+                ),
+                CircleButton(
+                  Icons.fast_forward,
+                  onPressed: () {
+                    _seekRelative(10);
+                  },
                 ),
                 CircleButton(
                   Icons.eject,
@@ -230,11 +253,12 @@ class CircleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RawMaterialButton(
+      constraints: BoxConstraints(minWidth: 20, minHeight: 40),
       onPressed: onPressed,
       child: new Icon(
         icon,
         color: Theme.of(context).primaryTextTheme.button.color,
-        size: 35.0,
+        size: 24.0,
       ),
       shape: new CircleBorder(),
       elevation: 1.0,
