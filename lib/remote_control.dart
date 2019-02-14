@@ -143,8 +143,8 @@ class _RemoteControlState extends State<RemoteControl> {
         body: SafeArea(
       child: Container(
         padding: EdgeInsets.symmetric(
-          vertical: 16.0,
-          horizontal: 16.0,
+          vertical: 12.0,
+          horizontal: 12.0,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -174,6 +174,7 @@ class _RemoteControlState extends State<RemoteControl> {
                   children: [
                     Text(
                       state != 'stopped' ? _formatTime(time) : '––:––',
+                      style: TextStyle(fontSize: 12),
                     ),
                     Flexible(
                         flex: 1,
@@ -212,6 +213,7 @@ class _RemoteControlState extends State<RemoteControl> {
                                 ? '-' + _formatTime(length - time)
                                 : _formatTime(length)
                             : '––:––',
+                        style: TextStyle(fontSize: 12),
                       ),
                     ),
                   ],
@@ -268,12 +270,12 @@ class CircleButton extends StatelessWidget {
       child: new Icon(
         icon,
         color: Theme.of(context).primaryTextTheme.button.color,
-        size: 24.0,
+        size: 26.0,
       ),
       shape: new CircleBorder(),
       elevation: 1.0,
       fillColor: Theme.of(context).primaryColor,
-      padding: EdgeInsets.all(10),
+      padding: EdgeInsets.all(12),
     );
   }
 }
