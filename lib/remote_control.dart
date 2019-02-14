@@ -112,11 +112,21 @@ class _RemoteControlState extends State<RemoteControl> {
     _statusRequest({
       'command': 'pl_pause',
     });
+    // Pre-empt the expected state so the button feels more responsive
+    setState(() {
+      state = (state == 'playing' ? 'paused' : 'playing');
+    });
   }
 
   _stop() {
     _statusRequest({
       'command': 'pl_stop',
+    });
+    // Pre-empt the expected state so the button feels more responsive
+    setState(() {
+      state = 'stopped';
+      time = Duration.zero;
+      length = Duration.zero;
     });
   }
 
