@@ -8,17 +8,16 @@ import 'package:xml/xml.dart' as xml;
 
 import 'models.dart';
 import 'open_media.dart';
+import 'utils.dart';
 
-String _formatTime(Duration duration) {
-  String minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
-  String seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
-  return '${duration.inHours >= 1 ? duration.inHours.toString() + ':' : ''}$minutes:$seconds';
-}
+var headerFooterBgColor = Colors.grey.shade200.withOpacity(0.75);
 
 class RemoteControl extends StatefulWidget {
   final SharedPreferences prefs;
 
-  RemoteControl({@required this.prefs});
+  RemoteControl({
+    @required this.prefs,
+  });
 
   @override
   State<StatefulWidget> createState() => _RemoteControlState();
@@ -34,13 +33,17 @@ class _RemoteControlState extends State<RemoteControl> {
   bool showTimeLeft = false;
   bool sliding = false;
 
+  BrowseItem playing;
+  List<BrowseItem> playlist;
+
   Future<xml.XmlDocument> _statusRequest(
       [Map<String, String> queryParameters]) async {
     var response = await http.get(
-        Uri.http('10.0.2.2:8080', '/requests/status.xml', queryParameters),
-        headers: {
-          'Authorization': 'Basic ' + base64Encode(utf8.encode(':vlcplayer'))
-        });
+      Uri.http('$vlcHost:$vlcPort', '/requests/status.xml', queryParameters),
+      headers: {
+        'Authorization': 'Basic ' + base64Encode(utf8.encode(':vlcplayer'))
+      },
+    );
     if (response.statusCode == 200) {
       return xml.parse(response.body);
     }
@@ -55,35 +58,52 @@ class _RemoteControlState extends State<RemoteControl> {
 
   _tick(timer) async {
     var document = await _statusRequest();
+    // TODO Try to detect if the playing file was changed from VLC itself and switch back to default display
     setState(() {
       state = document.findAllElements('state').first.text;
       if (!sliding) {
         time = Duration(
-            seconds: int.tryParse(document.findAllElements('time').first.text));
+          seconds: int.tryParse(document.findAllElements('time').first.text),
+        );
       }
       length = Duration(
           seconds: int.tryParse(document.findAllElements('length').first.text));
       Map<String, String> titles = Map.fromIterable(
-          document.findAllElements('info').where(
-              (el) => ['title', 'filename'].contains(el.getAttribute('name'))),
-          key: (el) => el.getAttribute('name'),
-          value: (el) => el.text);
+        document.findAllElements('info').where(
+            (el) => ['title', 'filename'].contains(el.getAttribute('name'))),
+        key: (el) => el.getAttribute('name'),
+        value: (el) => el.text,
+      );
       title = titles['title'] ?? titles['filename'] ?? '';
     });
   }
 
   _openMedia() async {
-    BrowseItem item = await Navigator.push(
+    BrowseResult result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => OpenMedia(prefs: widget.prefs)),
     );
 
-    if (item != null) {
+    if (result != null) {
       _statusRequest({
         'command': 'in_play',
-        'input': item.uri,
+        'input': result.item.uri,
+      });
+      setState(() {
+        playing = result.item;
+        playlist = result.playlist;
       });
     }
+  }
+
+  _play(BrowseItem item) {
+    _statusRequest({
+      'command': 'in_play',
+      'input': item.uri,
+    });
+    setState(() {
+      playing = item;
+    });
   }
 
   _seekPercent(int percent) async {
@@ -140,142 +160,182 @@ class _RemoteControlState extends State<RemoteControl> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        body: SafeArea(
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          vertical: 12.0,
-          horizontal: 12.0,
+      body: SafeArea(
+        child: Container(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              Container(
+                color: headerFooterBgColor,
+                child: ListTile(
+                  dense: true,
+                  title: Text(
+                    playing?.title ??
+                        cleanTitle(title.split(new RegExp(r'[\\\/]')).last),
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              Divider(height: 0),
+              _body(),
+              Divider(height: 0),
+              _footer(),
+            ],
+          ),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Row(children: [
-              Flexible(
-                  child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.title,
-                    textAlign: TextAlign.center,
-                  )
-                ],
-              )),
-            ]),
-            Expanded(
-              child: Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Image.asset('assets/vlc-icon.png')),
+      ),
+    );
+  }
+
+  Widget _body() {
+    if (playlist == null) {
+      return Expanded(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Image.asset('assets/vlc-icon.png'),
+        ),
+      );
+    }
+
+    return Expanded(
+      child: ListView.builder(
+        itemCount: playlist.length,
+        itemBuilder: (context, index) {
+          var item = playlist[index];
+          var isPlaying = item.path == playing.path;
+          return ListTile(
+            dense: true,
+            selected: isPlaying,
+            leading: Icon(Icons.movie),
+            title: Text(
+              item.title,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal,
+              ),
             ),
-            Container(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      state != 'stopped' ? _formatTime(time) : '––:––',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                    Flexible(
-                        flex: 1,
-                        child: Slider(
-                          divisions: 100,
-                          max: state != 'stopped' ? 100 : 0,
-                          value: _sliderValue(),
-                          onChangeStart: (percent) {
-                            setState(() {
-                              sliding = true;
-                            });
-                          },
-                          onChanged: (percent) {
-                            setState(() {
-                              time = Duration(
-                                  seconds: (length.inSeconds / 100 * percent)
-                                      .round());
-                            });
-                          },
-                          onChangeEnd: (percent) async {
-                            await _seekPercent(percent.round());
-                            setState(() {
-                              sliding = false;
-                            });
-                          },
-                        )),
-                    GestureDetector(
-                      onTap: () {
+            onTap: () {
+              _play(item);
+            },
+          );
+        },
+        // separatorBuilder: (context, index) => Divider(height: 0),
+      ),
+    );
+  }
+
+  Widget _footer() {
+    return Container(
+      color: headerFooterBgColor,
+      child: Column(
+        children: <Widget>[
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              children: <Widget>[
+                Text(
+                  state != 'stopped' ? formatTime(time) : '––:––',
+                  style: TextStyle(fontSize: 10),
+                ),
+                Flexible(
+                    flex: 1,
+                    child: Slider(
+                      divisions: 100,
+                      max: state != 'stopped' ? 100 : 0,
+                      value: _sliderValue(),
+                      onChangeStart: (percent) {
                         setState(() {
-                          showTimeLeft = !showTimeLeft;
+                          sliding = true;
                         });
                       },
-                      child: Text(
-                        state != 'stopped'
-                            ? showTimeLeft
-                                ? '-' + _formatTime(length - time)
-                                : _formatTime(length)
-                            : '––:––',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ],
-                )),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      onChanged: (percent) {
+                        setState(() {
+                          time = Duration(
+                              seconds:
+                                  (length.inSeconds / 100 * percent).round());
+                        });
+                      },
+                      onChangeEnd: (percent) async {
+                        await _seekPercent(percent.round());
+                        setState(() {
+                          sliding = false;
+                        });
+                      },
+                    )),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      showTimeLeft = !showTimeLeft;
+                    });
+                  },
+                  child: Text(
+                    state != 'stopped'
+                        ? showTimeLeft
+                            ? '-' + formatTime(length - time)
+                            : formatTime(length)
+                        : '––:––',
+                    style: TextStyle(fontSize: 10),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.only(left: 9, right: 9, bottom: 6),
+            child: Row(
+              // mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
-                CircleButton(
-                  Icons.fast_rewind,
-                  onPressed: () {
+                GestureDetector(
+                  child: Icon(
+                    Icons.stop,
+                    size: 30,
+                  ),
+                  onTap: _stop,
+                ),
+                Expanded(child: VerticalDivider()),
+                GestureDetector(
+                  child: Icon(
+                    Icons.fast_rewind,
+                    size: 24,
+                  ),
+                  onTap: () {
                     _seekRelative(-10);
                   },
                 ),
-                CircleButton(
-                  state == 'paused' || state == 'stopped'
-                      ? Icons.play_arrow
-                      : Icons.pause,
-                  onPressed: _pause,
-                ),
-                CircleButton(
-                  Icons.stop,
-                  onPressed: _stop,
-                ),
-                CircleButton(
-                  Icons.fast_forward,
-                  onPressed: () {
+                Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: GestureDetector(
+                      onTap: _pause,
+                      child: Icon(
+                        state == 'paused' || state == 'stopped'
+                            ? Icons.play_arrow
+                            : Icons.pause,
+                        size: 36,
+                      ),
+                    )),
+                GestureDetector(
+                  child: Icon(
+                    Icons.fast_forward,
+                    size: 24,
+                  ),
+                  onTap: () {
                     _seekRelative(10);
                   },
                 ),
-                CircleButton(
-                  Icons.eject,
-                  onPressed: _openMedia,
+                Expanded(child: VerticalDivider()),
+                GestureDetector(
+                  child: Icon(
+                    Icons.eject,
+                    size: 30,
+                  ),
+                  onTap: _openMedia,
                 ),
               ],
-            )
-          ],
-        ),
+            ),
+          )
+        ],
       ),
-    ));
-  }
-}
-
-class CircleButton extends StatelessWidget {
-  final IconData icon;
-  final Function onPressed;
-
-  CircleButton(this.icon, {@required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return RawMaterialButton(
-      constraints: BoxConstraints(minWidth: 20, minHeight: 40),
-      onPressed: onPressed,
-      child: new Icon(
-        icon,
-        color: Theme.of(context).primaryTextTheme.button.color,
-        size: 26.0,
-      ),
-      shape: new CircleBorder(),
-      elevation: 1.0,
-      fillColor: Theme.of(context).primaryColor,
-      padding: EdgeInsets.all(12),
     );
   }
 }

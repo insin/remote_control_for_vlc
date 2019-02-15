@@ -11,8 +11,11 @@ class FileBrowser extends StatefulWidget {
   final bool Function(BrowseItem) isFave;
   final Function(BrowseItem) onToggleFave;
 
-  FileBrowser(
-      {@required this.dir, @required this.isFave, @required this.onToggleFave});
+  FileBrowser({
+    @required this.dir,
+    @required this.isFave,
+    @required this.onToggleFave,
+  });
 
   @override
   State<StatefulWidget> createState() => _FileBrowserState();
@@ -28,60 +31,72 @@ class _FileBrowserState extends State<FileBrowser> {
     super.initState();
   }
 
-  _getListing(BrowseItem dir) {
+  _getListing(BrowseItem dir) async {
     setState(() {
       _loading = true;
     });
 
-    http.get(
-        Uri.http('10.0.2.2:8080', '/requests/browse.xml', {'uri': dir.uri}),
-        headers: {
-          'Authorization': 'Basic ' + base64Encode(utf8.encode(':vlcplayer'))
-        }).then((http.Response response) {
-      List<BrowseItem> items = [];
-      var dirIndex = 0;
-      if (response.statusCode == 200) {
-        var document = xml.parse(response.body);
-        document.findAllElements('element').forEach((el) {
-          var item = BrowseItem(
-              el.getAttribute('type'),
-              el.getAttribute('name'),
-              el.getAttribute('path'),
-              el.getAttribute('uri'));
-          if (item.name == '..') {
-            return;
-          }
-          if (item.type == 'dir') {
-            items.insert(dirIndex++, item);
-          } else {
-            items.add(item);
-          }
-        });
-      }
+    var response = await http.get(
+      Uri.http('$vlcHost:$vlcPort', '/requests/browse.xml', {'uri': dir.uri}),
+      headers: {
+        'Authorization': 'Basic ' + base64Encode(utf8.encode(':vlcplayer')),
+      },
+    );
 
-      setState(() {
-        _items = items;
-        _loading = false;
+    List<BrowseItem> items = [];
+    var dirIndex = 0;
+
+    if (response.statusCode == 200) {
+      var document = xml.parse(response.body);
+      document.findAllElements('element').forEach((el) {
+        var item = BrowseItem(
+          el.getAttribute('type'),
+          el.getAttribute('name'),
+          el.getAttribute('path'),
+          el.getAttribute('uri'),
+        );
+
+        if (item.name == '..') {
+          return;
+        }
+
+        if (item.type == 'dir') {
+          items.insert(dirIndex++, item);
+        } else if (item.isMovie) {
+          items.add(item);
+        }
       });
+    }
+
+    setState(() {
+      _items = items;
+      _loading = false;
     });
   }
 
   _handleTap(BrowseItem item) async {
     if (item.type == 'dir') {
-      BrowseItem selectedFile = await Navigator.push(
+      BrowseResult result = await Navigator.push(
         context,
         MaterialPageRoute(
-            builder: (context) => FileBrowser(
-                  dir: item,
-                  isFave: widget.isFave,
-                  onToggleFave: widget.onToggleFave,
-                )),
+          builder: (context) => FileBrowser(
+                dir: item,
+                isFave: widget.isFave,
+                onToggleFave: widget.onToggleFave,
+              ),
+        ),
       );
-      if (selectedFile != null) {
-        Navigator.pop(context, selectedFile);
+      if (result != null) {
+        Navigator.pop(context, result);
       }
     } else {
-      Navigator.pop(context, item);
+      Navigator.pop(
+        context,
+        BrowseResult(
+          item,
+          _items.where((i) => i.type == 'file').toList(),
+        ),
+      );
     }
   }
 
@@ -89,21 +104,22 @@ class _FileBrowserState extends State<FileBrowser> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.dir.name),
+        title: Text(widget.dir.title),
         actions: widget.dir.path != ''
             ? <Widget>[
                 IconButton(
-                    onPressed: () {
-                      setState(() {
-                        widget.onToggleFave(widget.dir);
-                      });
-                    },
-                    icon: Icon(
-                      widget.isFave(widget.dir)
-                          ? Icons.favorite
-                          : Icons.favorite_border,
-                      color: Colors.white,
-                    ))
+                  onPressed: () {
+                    setState(() {
+                      widget.onToggleFave(widget.dir);
+                    });
+                  },
+                  icon: Icon(
+                    widget.isFave(widget.dir)
+                        ? Icons.favorite
+                        : Icons.favorite_border,
+                    color: Colors.white,
+                  ),
+                )
               ]
             : null,
       ),
@@ -114,24 +130,33 @@ class _FileBrowserState extends State<FileBrowser> {
   _renderList() {
     if (_loading) {
       return Center(
-          child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [CircularProgressIndicator()],
-      ));
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[CircularProgressIndicator()],
+        ),
+      );
     }
 
-    return ListView(
-        children: _items
-            .map((item) => ListTile(
-                  leading: item.type == 'dir'
-                      ? Icon(Icons.folder)
-                      : Icon(Icons.insert_drive_file),
-                  title: Text(item.name),
-                  enabled: !_loading,
-                  onTap: () {
-                    _handleTap(item);
-                  },
-                ))
-            .toList());
+    return ListView.separated(
+      itemCount: _items.length,
+      itemBuilder: (context, i) {
+        var item = _items[i];
+        return ListTile(
+          dense: true,
+          leading: Icon(item.icon),
+          title: Text(item.title),
+          enabled: !_loading,
+          onTap: () {
+            _handleTap(item);
+          },
+        );
+      },
+      separatorBuilder: (context, i) {
+        if (_items[i].type == 'dir' && _items[i + 1]?.type == 'file') {
+          return Divider();
+        }
+        return SizedBox.shrink();
+      },
+    );
   }
 }

@@ -12,7 +12,9 @@ var homeFolderItem = BrowseItem('dir', 'Home', '', 'file://~');
 class OpenMedia extends StatefulWidget {
   final SharedPreferences prefs;
 
-  OpenMedia({@required this.prefs});
+  OpenMedia({
+    @required this.prefs,
+  });
 
   @override
   State<StatefulWidget> createState() => _OpenMediaState();
@@ -46,17 +48,18 @@ class _OpenMediaState extends State<OpenMedia> {
   }
 
   _selectFile(BrowseItem dir) async {
-    BrowseItem selectedFile = await Navigator.push(
+    BrowseResult result = await Navigator.push(
       context,
       MaterialPageRoute(
-          builder: (context) => FileBrowser(
-                dir: dir,
-                isFave: _isFave,
-                onToggleFave: _toggleFave,
-              )),
+        builder: (context) => FileBrowser(
+              dir: dir,
+              isFave: _isFave,
+              onToggleFave: _toggleFave,
+            ),
+      ),
     );
-    if (selectedFile != null) {
-      Navigator.pop(context, selectedFile);
+    if (result != null) {
+      Navigator.pop(context, result);
     }
   }
 
@@ -64,23 +67,28 @@ class _OpenMediaState extends State<OpenMedia> {
   Widget build(BuildContext context) {
     List<Widget> listItems = <Widget>[
       ListTile(
-          title: Text('File System'),
-          leading: Icon(Icons.folder),
-          onTap: () {
-            _selectFile(fileSystemItem);
-          }),
+        dense: true,
+        title: Text('File System'),
+        leading: Icon(Icons.folder),
+        onTap: () {
+          _selectFile(fileSystemItem);
+        },
+      ),
       ListTile(
-          title: Text('Home Folder'),
-          leading: Icon(Icons.home),
-          onTap: () {
-            _selectFile(homeFolderItem);
-          }),
+        dense: true,
+        title: Text('Home Folder'),
+        leading: Icon(Icons.home),
+        onTap: () {
+          _selectFile(homeFolderItem);
+        },
+      ),
     ];
 
     if (_faves.isNotEmpty) {
       listItems.addAll([
         Divider(),
         ListTile(
+          dense: true,
           title: Text('Faves', style: Theme.of(context).textTheme.subtitle),
         ),
       ]);
@@ -88,11 +96,13 @@ class _OpenMediaState extends State<OpenMedia> {
             key: Key(item.path),
             background: LeaveBehindView(),
             child: ListTile(
-                title: Text(item.name),
-                leading: Icon(Icons.folder_special),
-                onTap: () {
-                  _selectFile(item);
-                }),
+              dense: true,
+              title: Text(item.name),
+              leading: Icon(Icons.folder_special),
+              onTap: () {
+                _selectFile(item);
+              },
+            ),
             onDismissed: (direction) {
               _toggleFave(item);
             },
@@ -117,7 +127,7 @@ class LeaveBehindView extends StatelessWidget {
       color: Colors.red,
       padding: const EdgeInsets.all(16.0),
       child: new Row(
-        children: [
+        children: <Widget>[
           new Icon(Icons.delete, color: Colors.white),
           new Expanded(
             child: new Text(''),

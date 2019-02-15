@@ -11,7 +11,9 @@ void main() async {
 class MyApp extends StatelessWidget {
   final SharedPreferences prefs;
 
-  MyApp({@required this.prefs});
+  MyApp({
+    @required this.prefs,
+  });
 
   @override
   Widget build(BuildContext context) {
