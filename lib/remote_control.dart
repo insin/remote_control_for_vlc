@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:connectivity/connectivity.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -57,6 +58,26 @@ class _RemoteControlState extends State<RemoteControl> {
   initState() {
     ticker = new Timer.periodic(Duration(seconds: 1), _tick);
     super.initState();
+    _checkWifi();
+  }
+
+  _checkWifi() async {
+    var connectivityResult = await (new Connectivity().checkConnectivity());
+    if (connectivityResult != ConnectivityResult.wifi) {
+      _showWifiAlert(context);
+    }
+  }
+
+  void _showWifiAlert(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+            title: Text('Please enable Wi-Fi'),
+            content: Text(
+              'A Wi-Fi connection was not detected.\n\nVLC Remote needs to connect to your local network to control VLC.',
+            ),
+          ),
+    );
   }
 
   _tick(timer) async {
