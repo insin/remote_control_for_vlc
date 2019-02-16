@@ -7,13 +7,15 @@ import 'file_browser.dart';
 import 'models.dart';
 
 var fileSystemItem = BrowseItem('dir', 'File System', '', 'file:///');
-var homeFolderItem = BrowseItem('dir', 'Home', '', 'file://~');
+// var homeFolderItem = BrowseItem('dir', 'Home', '', 'file://~');
 
 class OpenMedia extends StatefulWidget {
   final SharedPreferences prefs;
+  final Settings settings;
 
   OpenMedia({
     @required this.prefs,
+    @required this.settings,
   });
 
   @override
@@ -55,6 +57,7 @@ class _OpenMediaState extends State<OpenMedia> {
               dir: dir,
               isFave: _isFave,
               onToggleFave: _toggleFave,
+              settings: widget.settings,
             ),
       ),
     );
@@ -67,36 +70,36 @@ class _OpenMediaState extends State<OpenMedia> {
   Widget build(BuildContext context) {
     List<Widget> listItems = <Widget>[
       ListTile(
-        dense: true,
+        dense: widget.settings.dense,
         title: Text('File System'),
         leading: Icon(Icons.folder),
         onTap: () {
           _selectFile(fileSystemItem);
         },
       ),
-      ListTile(
-        dense: true,
-        title: Text('Home Folder'),
-        leading: Icon(Icons.home),
-        onTap: () {
-          _selectFile(homeFolderItem);
-        },
-      ),
+//      ListTile(
+//        dense: widget.settings.dense,
+//        title: Text('Home Folder'),
+//        leading: Icon(Icons.home),
+//        onTap: () {
+//          _selectFile(homeFolderItem);
+//        },
+//      ),
     ];
 
     if (_faves.isNotEmpty) {
       listItems.addAll([
         Divider(),
         ListTile(
-          dense: true,
-          title: Text('Faves', style: Theme.of(context).textTheme.subtitle),
+          dense: widget.settings.dense,
+          title: Text('Starred', style: Theme.of(context).textTheme.subtitle),
         ),
       ]);
       listItems.addAll(_faves.map((item) => Dismissible(
             key: Key(item.path),
             background: LeaveBehindView(),
             child: ListTile(
-              dense: true,
+              dense: widget.settings.dense,
               title: Text(item.name),
               leading: Icon(Icons.folder_special),
               onTap: () {

@@ -8,15 +8,18 @@ import 'package:xml/xml.dart' as xml;
 
 import 'models.dart';
 import 'open_media.dart';
+import 'settings_screen.dart';
 import 'utils.dart';
 
 var headerFooterBgColor = Colors.grey.shade200.withOpacity(0.75);
 
 class RemoteControl extends StatefulWidget {
   final SharedPreferences prefs;
+  final Settings settings;
 
   RemoteControl({
     @required this.prefs,
+    @required this.settings,
   });
 
   @override
@@ -41,7 +44,7 @@ class _RemoteControlState extends State<RemoteControl> {
     var response = await http.get(
       Uri.http('$vlcHost:$vlcPort', '/requests/status.xml', queryParameters),
       headers: {
-        'Authorization': 'Basic ' + base64Encode(utf8.encode(':vlcplayer'))
+        'Authorization': 'Basic ' + base64Encode(utf8.encode(':$vlcPassword'))
       },
     );
     if (response.statusCode == 200) {
@@ -81,7 +84,11 @@ class _RemoteControlState extends State<RemoteControl> {
   _openMedia() async {
     BrowseResult result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => OpenMedia(prefs: widget.prefs)),
+      MaterialPageRoute(
+          builder: (context) => OpenMedia(
+                prefs: widget.prefs,
+                settings: widget.settings,
+              )),
     );
 
     if (result != null) {
@@ -168,12 +175,31 @@ class _RemoteControlState extends State<RemoteControl> {
               Container(
                 color: headerFooterBgColor,
                 child: ListTile(
-                  dense: true,
+                  contentPadding: EdgeInsets.only(left: 14),
+                  dense: widget.settings.dense,
                   title: Text(
                     playing?.title ??
                         cleanTitle(title.split(new RegExp(r'[\\\/]')).last),
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  trailing: IconButton(
+                    icon: Icon(Icons.settings),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SettingsScreen(
+                                settings: widget.settings,
+                                onSettingsChanged: () {
+                                  setState(() {
+                                    widget.settings.save();
+                                  });
+                                },
+                              ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -205,7 +231,7 @@ class _RemoteControlState extends State<RemoteControl> {
           var item = playlist[index];
           var isPlaying = item.path == playing.path;
           return ListTile(
-            dense: true,
+            dense: widget.settings.dense,
             selected: isPlaying,
             leading: Icon(Icons.movie),
             title: Text(

@@ -10,11 +10,13 @@ class FileBrowser extends StatefulWidget {
   final BrowseItem dir;
   final bool Function(BrowseItem) isFave;
   final Function(BrowseItem) onToggleFave;
+  final Settings settings;
 
   FileBrowser({
     @required this.dir,
     @required this.isFave,
     @required this.onToggleFave,
+    @required this.settings,
   });
 
   @override
@@ -39,7 +41,7 @@ class _FileBrowserState extends State<FileBrowser> {
     var response = await http.get(
       Uri.http('$vlcHost:$vlcPort', '/requests/browse.xml', {'uri': dir.uri}),
       headers: {
-        'Authorization': 'Basic ' + base64Encode(utf8.encode(':vlcplayer')),
+        'Authorization': 'Basic ' + base64Encode(utf8.encode(':$vlcPassword')),
       },
     );
 
@@ -83,6 +85,7 @@ class _FileBrowserState extends State<FileBrowser> {
                 dir: item,
                 isFave: widget.isFave,
                 onToggleFave: widget.onToggleFave,
+                settings: widget.settings,
               ),
         ),
       );
@@ -114,9 +117,7 @@ class _FileBrowserState extends State<FileBrowser> {
                     });
                   },
                   icon: Icon(
-                    widget.isFave(widget.dir)
-                        ? Icons.favorite
-                        : Icons.favorite_border,
+                    widget.isFave(widget.dir) ? Icons.star : Icons.star_border,
                     color: Colors.white,
                   ),
                 )
@@ -142,7 +143,7 @@ class _FileBrowserState extends State<FileBrowser> {
       itemBuilder: (context, i) {
         var item = _items[i];
         return ListTile(
-          dense: true,
+          dense: widget.settings.dense,
           leading: Icon(item.icon),
           title: Text(item.title),
           enabled: !_loading,

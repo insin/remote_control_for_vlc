@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'models.dart';
 import 'remote_control.dart';
 
 void main() async {
   var prefs = await SharedPreferences.getInstance();
-  runApp(MyApp(prefs: prefs));
+  runApp(VlcRemote(prefs: prefs, settings: Settings(prefs)));
 }
 
-class MyApp extends StatelessWidget {
+class VlcRemote extends StatelessWidget {
   final SharedPreferences prefs;
+  final Settings settings;
 
-  MyApp({
+  VlcRemote({
     @required this.prefs,
+    @required this.settings,
   });
 
   @override
@@ -22,7 +25,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.deepOrange,
       ),
-      home: RemoteControl(prefs: prefs),
+      home: RemoteControl(prefs: prefs, settings: settings),
     );
   }
 }

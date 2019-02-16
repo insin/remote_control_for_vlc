@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'utils.dart';
 
@@ -6,6 +9,7 @@ const emulatorLocalhost = '10.0.2.2';
 
 const vlcHost = emulatorLocalhost;
 const vlcPort = '8080';
+const vlcPassword = 'vlcplayer';
 
 var _videoExtensions = new RegExp(r'\.(avi|mkv|mp4)$');
 
@@ -171,4 +175,27 @@ class BrowseResult {
   List<BrowseItem> playlist;
 
   BrowseResult(this.item, this.playlist);
+}
+
+class Settings {
+  SharedPreferences _prefs;
+
+  bool dense;
+  String ip;
+  String port;
+  String password;
+
+  Settings(this._prefs) {
+    Map<String, dynamic> json =
+        jsonDecode(_prefs.getString('settings') ?? '{}');
+    dense = json['dense'] ?? false;
+  }
+
+  Map<String, dynamic> toJson() => {
+        'dense': dense,
+      };
+
+  save() {
+    _prefs.setString('settings', jsonEncode(this));
+  }
 }
