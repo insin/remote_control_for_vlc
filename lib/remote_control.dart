@@ -283,7 +283,6 @@ class _RemoteControlState extends State<RemoteControl> {
               children: <Widget>[
                 Text(
                   state != 'stopped' ? formatTime(time) : '––:––',
-                  style: TextStyle(fontSize: 10),
                 ),
                 Flexible(
                     flex: 1,
@@ -299,8 +298,8 @@ class _RemoteControlState extends State<RemoteControl> {
                       onChanged: (percent) {
                         setState(() {
                           time = Duration(
-                              seconds:
-                                  (length.inSeconds / 100 * percent).round());
+                            seconds: (length.inSeconds / 100 * percent).round(),
+                          );
                         });
                       },
                       onChangeEnd: (percent) async {
@@ -322,14 +321,13 @@ class _RemoteControlState extends State<RemoteControl> {
                             ? '-' + formatTime(length - time)
                             : formatTime(length)
                         : '––:––',
-                    style: TextStyle(fontSize: 10),
                   ),
                 ),
               ],
             ),
           ),
           Padding(
-            padding: EdgeInsets.only(left: 9, right: 9, bottom: 6),
+            padding: EdgeInsets.only(left: 9, right: 9, bottom: 6, top: 3),
             child: Row(
               // mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
@@ -344,7 +342,7 @@ class _RemoteControlState extends State<RemoteControl> {
                 GestureDetector(
                   child: Icon(
                     Icons.fast_rewind,
-                    size: 24,
+                    size: 30,
                   ),
                   onTap: () {
                     _seekRelative(-10);
@@ -358,13 +356,13 @@ class _RemoteControlState extends State<RemoteControl> {
                         state == 'paused' || state == 'stopped'
                             ? Icons.play_arrow
                             : Icons.pause,
-                        size: 36,
+                        size: 42,
                       ),
                     )),
                 GestureDetector(
                   child: Icon(
                     Icons.fast_forward,
-                    size: 24,
+                    size: 30,
                   ),
                   onTap: () {
                     _seekRelative(10);
