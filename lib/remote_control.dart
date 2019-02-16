@@ -193,7 +193,7 @@ class _RemoteControlState extends State<RemoteControl> {
       return Expanded(
         child: Padding(
           padding: EdgeInsets.all(32),
-          child: Image.asset('assets/vlc-icon.png'),
+          child: Image.asset('assets/icon-512.png'),
         ),
       );
     }

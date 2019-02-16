@@ -16,9 +16,17 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.7.0
+
+flutter_icons:
+  # update with: flutter packages pub run flutter_launcher_icons:main
+  android: true
+  image_path: icons/icon.png
+  adaptive_icon_background: "#ffffff"
+  adaptive_icon_foreground: icons/icon.png
 
 flutter:
   uses-material-design: true
 
   assets:
-    - assets/vlc-icon.png
+    - assets/icon-512.png
