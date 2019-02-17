@@ -7,6 +7,7 @@ import 'utils.dart';
 
 const emulatorLocalhost = '10.0.2.2';
 
+// TODO Remove once connection details are provided via Settings
 const vlcHost = emulatorLocalhost;
 const vlcPort = '8080';
 const vlcPassword = 'vlcplayer';
@@ -201,10 +202,16 @@ class Settings {
     Map<String, dynamic> json =
         jsonDecode(_prefs.getString('settings') ?? '{}');
     dense = json['dense'] ?? false;
+    ip = vlcHost;
+    port = json['port'] ?? vlcPort;
+    password = json['password'] ?? vlcPassword;
   }
 
   Map<String, dynamic> toJson() => {
         'dense': dense,
+        'ip': ip,
+        'port': port,
+        'password': password,
       };
 
   save() {

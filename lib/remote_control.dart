@@ -62,7 +62,7 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _checkWifi() async {
-    var connectivityResult = await (new Connectivity().checkConnectivity());
+    var connectivityResult = await Connectivity().checkConnectivity();
     if (connectivityResult != ConnectivityResult.wifi) {
       _showWifiAlert(context);
     }
