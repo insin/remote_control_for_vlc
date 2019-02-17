@@ -64,7 +64,7 @@ class _FileBrowserState extends State<FileBrowser> {
 
         if (item.type == 'dir') {
           items.insert(dirIndex++, item);
-        } else if (item.isMovie) {
+        } else if (item.isSupportedMedia) {
           items.add(item);
         }
       });

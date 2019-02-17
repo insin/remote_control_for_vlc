@@ -11,7 +11,11 @@ const vlcHost = emulatorLocalhost;
 const vlcPort = '8080';
 const vlcPassword = 'vlcplayer';
 
-var _videoExtensions = new RegExp(r'\.(avi|mkv|mp4)$');
+var _videoExtensions = new RegExp(
+    r'\.(3g2|3gp|3gp2|3gpp|amv|asf|avi|divx|drc|dv|f4v|flv|gvi|gxf|ismv|iso|m1v|m2v|m2t|m2ts|m4v|mkv|mov|mp2|mp2v|mp4|mp4v|mpe|mpeg|mpeg1|mpeg2|mpeg4|mpg|mpv2|mts|mtv|mxf|mxg|nsv|nut|nuv|ogm|ogv|ogx|ps|rec|rm|rmvb|tod|ts|tts|vob|vro|webm|wm|wmv|wtv|xesc)$');
+
+var _audioExtensions = new RegExp(
+    r'\.(3ga|a52|aac|ac3|adt|adts|aif|aifc|aiff|alac|amr|aob|ape|awb|caf|dts|flac|it|m4a|m4b|m4p|mid|mka|mlp|mod|mpa|mp1|mp2|mp3|mpc|mpga|oga|ogg|oma|opus|ra|ram|rmi|s3m|spx|tta|voc|vqf|w64|wav|wma|wv|xa|xm)$');
 
 var _episode = new RegExp(r's\d\de\d\d', caseSensitive: false);
 
@@ -158,14 +162,22 @@ class BrowseItem {
       return Icons.folder;
     }
 
-    if (isMovie) {
+    if (isAudio) {
+      return Icons.audiotrack;
+    }
+
+    if (isVideo) {
       return Icons.movie;
     }
 
     return Icons.insert_drive_file;
   }
 
-  bool get isMovie => _videoExtensions.hasMatch(path);
+  bool get isAudio => _audioExtensions.hasMatch(path);
+
+  bool get isVideo => _videoExtensions.hasMatch(path);
+
+  bool get isSupportedMedia => isAudio || isVideo;
 
   String get title => cleanTitle(name, keepExt: type == 'file');
 }
