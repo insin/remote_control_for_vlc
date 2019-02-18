@@ -142,6 +142,15 @@ class _FileBrowserState extends State<FileBrowser> {
       );
     }
 
+    if (_items.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[Text('No compatible files found')],
+        ),
+      );
+    }
+
     return ListView.separated(
       itemCount: _items.length,
       itemBuilder: (context, i) {
