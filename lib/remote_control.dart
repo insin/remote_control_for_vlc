@@ -68,16 +68,22 @@ class _RemoteControlState extends State<RemoteControl> {
     }
   }
 
-  void _showWifiAlert(BuildContext context) {
-    showDialog(
+  void _showWifiAlert(BuildContext context) async {
+    var subscription = Connectivity().onConnectivityChanged.listen((result) {
+      if (result == ConnectivityResult.wifi) {
+        Navigator.pop(context);
+      }
+    });
+    await showDialog(
       context: context,
       builder: (context) => AlertDialog(
-            title: Text('Please enable Wi-Fi'),
+            title: Text('Turn on Wi-Fi'),
             content: Text(
               'A Wi-Fi connection was not detected.\n\nVLC Remote needs to connect to your local network to control VLC.',
             ),
           ),
     );
+    subscription.cancel();
   }
 
   _tick(timer) async {
