@@ -43,9 +43,15 @@ class _RemoteControlState extends State<RemoteControl> {
   Future<xml.XmlDocument> _statusRequest(
       [Map<String, String> queryParameters]) async {
     var response = await http.get(
-      Uri.http('$vlcHost:$vlcPort', '/requests/status.xml', queryParameters),
+      Uri.http(
+        widget.settings.connection.authority,
+        '/requests/status.xml',
+        queryParameters,
+      ),
       headers: {
-        'Authorization': 'Basic ' + base64Encode(utf8.encode(':$vlcPassword'))
+        'Authorization': 'Basic ' +
+            base64Encode(
+                utf8.encode(':${widget.settings.connection.password}')),
       },
     );
     if (response.statusCode == 200) {

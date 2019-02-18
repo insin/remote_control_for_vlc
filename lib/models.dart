@@ -5,13 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'utils.dart';
 
-const emulatorLocalhost = '10.0.2.2';
-
-// TODO Remove once connection details are provided via Settings
-const vlcHost = emulatorLocalhost;
-const vlcPort = '8080';
-const vlcPassword = 'vlcplayer';
-
 var _videoExtensions = new RegExp(
     r'\.(3g2|3gp|3gp2|3gpp|amv|asf|avi|divx|drc|dv|f4v|flv|gvi|gxf|ismv|iso|m1v|m2v|m2t|m2ts|m4v|mkv|mov|mp2|mp2v|mp4|mp4v|mpe|mpeg|mpeg1|mpeg2|mpeg4|mpg|mpv2|mts|mtv|mxf|mxg|nsv|nut|nuv|ogm|ogv|ogx|ps|rec|rm|rmvb|tod|ts|tts|vob|vro|webm|wm|wmv|wtv|xesc)$');
 
@@ -190,28 +183,98 @@ class BrowseResult {
   BrowseResult(this.item, this.playlist);
 }
 
+const _emulatorLocalhost = '10.0.2.2';
+
+const _defaultPort = '8080';
+const _defaultPassword = 'vlcplayer';
+
+var _ipPattern = RegExp(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$');
+var _numericPattern = RegExp(r'^\d+$');
+
+class Connection {
+  String _ip;
+  String _port;
+  String _password;
+
+  String _ipError;
+  String _portError;
+  String _passwordError;
+
+  Connection();
+
+  get ip => _ip;
+  get port => _port;
+  get password => _password;
+  get ipError => _ipError;
+  get portError => _portError;
+  get passwordError => _passwordError;
+
+  String get authority => '$_ip:$_port';
+
+  bool get isValid =>
+      _ipError == null && _portError == null && _passwordError == null;
+
+  set ip(String value) {
+    if (value.trim().isEmpty) {
+      _ipError = 'An IP address is required';
+    } else if (!_ipPattern.hasMatch(value)) {
+      _ipError = 'Must have 4 parts separated by periods';
+    } else {
+      _ipError = null;
+    }
+    _ip = value;
+  }
+
+  set port(String value) {
+    _port = value;
+    if (value.trim().isEmpty) {
+      _portError = 'A port number is required';
+    } else if (!_numericPattern.hasMatch(value)) {
+      _portError = 'Must be all digits';
+    } else {
+      _portError = null;
+    }
+    _port = value;
+  }
+
+  set password(String value) {
+    if (value.trim().isEmpty) {
+      _passwordError = 'A password is required';
+    } else {
+      _passwordError = null;
+    }
+    _password = value;
+  }
+
+  Connection.fromJson(Map<String, dynamic> json) {
+    ip = json['ip'] ?? '';
+    port = json['port'] ?? _defaultPort;
+    password = json['password'] ?? _defaultPassword;
+  }
+
+  Map<String, dynamic> toJson() => {
+        'ip': ip,
+        'port': port,
+        'password': password,
+      };
+}
+
 class Settings {
   SharedPreferences _prefs;
 
   bool dense;
-  String ip;
-  String port;
-  String password;
+  Connection connection;
 
   Settings(this._prefs) {
     Map<String, dynamic> json =
         jsonDecode(_prefs.getString('settings') ?? '{}');
     dense = json['dense'] ?? false;
-    ip = vlcHost;
-    port = json['port'] ?? vlcPort;
-    password = json['password'] ?? vlcPassword;
+    connection = Connection.fromJson(json['connection'] ?? {});
   }
 
   Map<String, dynamic> toJson() => {
         'dense': dense,
-        'ip': ip,
-        'port': port,
-        'password': password,
+        'connection': connection,
       };
 
   save() {

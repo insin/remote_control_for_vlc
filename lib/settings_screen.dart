@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:connectivity/connectivity.dart';
 import 'package:flutter/material.dart';
@@ -15,61 +16,6 @@ class SettingsScreen extends StatefulWidget {
 
   @override
   State<StatefulWidget> createState() => _SettingsScreenState();
-}
-
-var _ipPattern = RegExp(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$');
-var _numericPattern = RegExp(r'^\d+$');
-
-class Connection {
-  String _ip;
-  String _port;
-  String _password;
-
-  String _ipError;
-  String _portError;
-  String _passwordError;
-
-  bool get isValid =>
-      _ipError == null && _portError == null && _passwordError == null;
-
-  get ip => _ip;
-  get port => _port;
-  get password => _password;
-  get ipError => _ipError;
-  get portError => _portError;
-  get passwordError => _passwordError;
-
-  set ip(String value) {
-    if (value.trim().isEmpty) {
-      _ipError = 'An IP address is required';
-    } else if (!_ipPattern.hasMatch(value)) {
-      _ipError = 'Must have 4 parts separated by periods';
-    } else {
-      _ipError = null;
-    }
-    _ip = value;
-  }
-
-  set port(String value) {
-    _port = value;
-    if (value.trim().isEmpty) {
-      _portError = 'A port number is required';
-    } else if (!_numericPattern.hasMatch(value)) {
-      _portError = 'Must be all digits';
-    } else {
-      _portError = null;
-    }
-    _port = value;
-  }
-
-  set password(String value) {
-    if (value.trim().isEmpty) {
-      _passwordError = 'A password is required';
-    } else {
-      _passwordError = null;
-    }
-    _password = value;
-  }
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
@@ -112,9 +58,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       });
     });
 
-    ipController.text = widget.settings.ip;
-    portController.text = widget.settings.port;
-    passwordController.text = widget.settings.password;
+    ipController.text = widget.settings.connection.ip;
+    portController.text = widget.settings.connection.port;
+    passwordController.text = widget.settings.connection.password;
 
     ipFocus.addListener(() {
       if (!ipFocus.hasFocus) {
@@ -140,7 +86,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     super.initState();
 
-    if (widget.settings.ip == '') {
+    if (widget.settings.connection.ip == '') {
       _defaultIpPrefix();
     }
   }
@@ -201,24 +147,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 base64Encode(utf8.encode(':${passwordController.text}'))
           }).timeout(Duration(seconds: 5));
 
-      if (response.statusCode == 401) {
-        result = 'Password is invalid';
-        icon = Icons.warning;
-      } else if (response.statusCode == 200) {
+      if (response.statusCode == 200) {
+        widget.settings.connection = connection;
+        widget.onSettingsChanged();
         result = 'Connection successful';
+        description = 'Connection settings saved';
         icon = Icons.check;
       } else {
-        result = 'Unexpected response code: ${response.statusCode}';
         icon = Icons.error;
+        if (response.statusCode == 401) {
+          result = 'Password is invalid';
+          description = 'Press and hold the eye icon to check your password';
+        } else {
+          result = 'Unexpected response';
+          description = 'Status code: ${response.statusCode}';
+        }
       }
     } catch (e) {
+      description = 'Check the IP and port settings';
+      icon = Icons.error;
       if (e is TimeoutException) {
         result = 'Connection timed out';
-        description = 'Check the IP and port settings';
-        icon = Icons.warning;
+      } else if (e is SocketException) {
+        result = 'Connection error';
       } else {
-        result = 'Unknown error: ${e.runtimeType}';
-        icon = Icons.error;
+        result = 'Connection error: ${e.runtimeType}';
       }
     }
 
@@ -230,39 +183,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
-  String _validateIp() {
-    if (ipController.text.trim().isEmpty) {
-      return 'An IP address is required';
-    }
-    if (!RegExp(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')
-        .hasMatch(ipController.text)) {
-      return 'Must have 4 parts separated by periods';
-    }
-    return null;
-  }
-
-  String _validatePort() {
-    if (portController.text.trim().isEmpty) {
-      return 'A port number is required';
-    }
-    if (!RegExp(r'^\d+$').hasMatch(portController.text)) {
-      return 'Must be all digits';
-    }
-    return null;
-  }
-
-  String _validatePassword() {
-    if (passwordController.text.trim().isEmpty) {
-      return 'A password is required';
-    }
-    return null;
-  }
-
-  bool _allValid() {
-    return [_validateIp(), _validatePassword(), _validatePort()]
-        .every((error) => error == null);
-  }
-
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -272,7 +192,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ListTile(
           dense: widget.settings.dense,
           title: Text(
-            'VLC HTTP connection',
+            'VLC connection',
             style: Theme.of(context).textTheme.subhead,
           ),
         ),
@@ -341,32 +261,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: Theme.of(context).buttonTheme.colorScheme.primary,
             // XXX Hardcoding as theme colouring doesn't seem to be working
             textColor: Colors.white,
-            onPressed: _testConnection,
+            onPressed: !testingConnection ? _testConnection : null,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                testingConnection
-                    ? SizedBox(
-                        width: 20.0,
-                        height: 20.0,
-                        child: CircularProgressIndicator(
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : Icon(Icons.school),
+                Icon(Icons.network_check),
                 const SizedBox(width: 8.0),
-                Text('Test${testingConnection ? 'ing' : ''} Connection'),
+                Text('Test Connection'),
               ],
             ),
           ),
         ),
         Visibility(
-          visible: connectionTestResult != null,
+          visible: testingConnection || connectionTestResult != null,
           child: ListTile(
             dense: widget.settings.dense,
-            leading: Icon(connectionTestResultIcon),
-            title: Text(connectionTestResult ?? ''),
+            leading: testingConnection
+                ? SizedBox(
+                    width: 20.0,
+                    height: 20.0,
+                    child: CircularProgressIndicator(),
+                  )
+                : Icon(
+                    connectionTestResultIcon,
+                    color: connectionTestResultIcon == Icons.check
+                        ? Colors.green
+                        : Colors.redAccent,
+                  ),
+            title: Text(testingConnection
+                ? 'Testing connection...'
+                : connectionTestResult ?? ''),
             subtitle: connectionTestResultDescription != null
                 ? Text(connectionTestResultDescription)
                 : null,

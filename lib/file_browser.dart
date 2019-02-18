@@ -39,9 +39,13 @@ class _FileBrowserState extends State<FileBrowser> {
     });
 
     var response = await http.get(
-      Uri.http('$vlcHost:$vlcPort', '/requests/browse.xml', {'uri': dir.uri}),
+      Uri.http(widget.settings.connection.authority, '/requests/browse.xml', {
+        'uri': dir.uri,
+      }),
       headers: {
-        'Authorization': 'Basic ' + base64Encode(utf8.encode(':$vlcPassword')),
+        'Authorization': 'Basic ' +
+            base64Encode(
+                utf8.encode(':${widget.settings.connection.password}')),
       },
     );
 
