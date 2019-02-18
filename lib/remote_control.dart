@@ -93,6 +93,10 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _tick(timer) async {
+    if (!widget.settings.connection.isValid) {
+      return;
+    }
+
     var document = await _statusRequest();
     // TODO Try to detect if the playing file was changed from VLC itself and switch back to default display
     setState(() {
