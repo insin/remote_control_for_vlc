@@ -7,7 +7,6 @@ import 'file_browser.dart';
 import 'models.dart';
 
 var fileSystemItem = BrowseItem('dir', 'File System', '', 'file:///');
-// var homeFolderItem = BrowseItem('dir', 'Home', '', 'file://~');
 
 class OpenMedia extends StatefulWidget {
   final SharedPreferences prefs;
@@ -77,14 +76,6 @@ class _OpenMediaState extends State<OpenMedia> {
           _selectFile(fileSystemItem);
         },
       ),
-//      ListTile(
-//        dense: widget.settings.dense,
-//        title: Text('Home Folder'),
-//        leading: Icon(Icons.home),
-//        onTap: () {
-//          _selectFile(homeFolderItem);
-//        },
-//      ),
     ];
 
     if (_faves.isNotEmpty) {
