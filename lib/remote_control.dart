@@ -270,7 +270,7 @@ class _RemoteControlState extends State<RemoteControl> {
           return ListTile(
             dense: widget.settings.dense,
             selected: isPlaying,
-            leading: Icon(playing.icon),
+            leading: Icon(item.icon),
             title: Text(
               item.title,
               overflow: TextOverflow.ellipsis,
