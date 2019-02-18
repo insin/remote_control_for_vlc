@@ -40,7 +40,7 @@ class _RemoteControlState extends State<RemoteControl> {
   BrowseItem playing;
   List<BrowseItem> playlist;
 
-  Future<xml.XmlDocument> _statusRequest(
+  Future<VlcStatusResponse> _statusRequest(
       [Map<String, String> queryParameters]) async {
     var response = await http.get(
       Uri.http(
@@ -55,7 +55,7 @@ class _RemoteControlState extends State<RemoteControl> {
       },
     );
     if (response.statusCode == 200) {
-      return xml.parse(response.body);
+      return VlcStatusResponse(xml.parse(response.body));
     }
     return null;
   }
@@ -65,6 +65,21 @@ class _RemoteControlState extends State<RemoteControl> {
     ticker = new Timer.periodic(Duration(seconds: 1), _tick);
     super.initState();
     _checkWifi();
+  }
+
+  _togglePolling(context) {
+    String message;
+    if (ticker.isActive) {
+      ticker.cancel();
+      message = 'Paused polling for status updates';
+    } else {
+      ticker = new Timer.periodic(Duration(seconds: 1), _tick);
+      message = 'Resumed polling for status updates';
+    }
+    Scaffold.of(context).showSnackBar(SnackBar(
+      content: Text(message),
+    ));
+    setState(() {});
   }
 
   _checkWifi() async {
@@ -97,24 +112,15 @@ class _RemoteControlState extends State<RemoteControl> {
       return;
     }
 
-    var document = await _statusRequest();
+    var response = await _statusRequest();
     // TODO Try to detect if the playing file was changed from VLC itself and switch back to default display
     setState(() {
-      state = document.findAllElements('state').first.text;
+      state = response.state;
+      length = response.length;
+      title = response.title;
       if (!sliding) {
-        time = Duration(
-          seconds: int.tryParse(document.findAllElements('time').first.text),
-        );
+        time = response.time;
       }
-      length = Duration(
-          seconds: int.tryParse(document.findAllElements('length').first.text));
-      Map<String, String> titles = Map.fromIterable(
-        document.findAllElements('info').where(
-            (el) => ['title', 'filename'].contains(el.getAttribute('name'))),
-        key: (el) => el.getAttribute('name'),
-        value: (el) => el.text,
-      );
-      title = titles['title'] ?? titles['filename'] ?? '';
     });
   }
 
@@ -140,57 +146,63 @@ class _RemoteControlState extends State<RemoteControl> {
     }
   }
 
-  _play(BrowseItem item) {
-    _statusRequest({
+  _play(BrowseItem item) async {
+    var response = await _statusRequest({
       'command': 'in_play',
       'input': item.uri,
     });
     setState(() {
       playing = item;
+      state = response.state;
+      time = response.time;
+      length = response.length;
+      title = response.title;
     });
   }
 
   _seekPercent(int percent) async {
-    var document = await _statusRequest({
+    var response = await _statusRequest({
       'command': 'seek',
       'val': '$percent%',
     });
     setState(() {
-      time = Duration(
-          seconds: int.tryParse(document.findAllElements('time').first.text));
+      time = response.time;
     });
   }
 
   _seekRelative(int seekTime) async {
-    var document = await _statusRequest({
+    var response = await _statusRequest({
       'command': 'seek',
       'val': '''${seekTime > 0 ? '+' : ''}${seekTime}S''',
     });
     setState(() {
-      time = Duration(
-          seconds: int.tryParse(document.findAllElements('time').first.text));
+      time = response.time;
     });
   }
 
-  _pause() {
-    _statusRequest({
-      'command': 'pl_pause',
-    });
+  _pause() async {
     // Pre-empt the expected state so the button feels more responsive
     setState(() {
       state = (state == 'playing' ? 'paused' : 'playing');
     });
+    var response = await _statusRequest({
+      'command': 'pl_pause',
+    });
+    setState(() {
+      state = response.state;
+      time = response.time;
+    });
   }
 
   _stop() {
-    _statusRequest({
-      'command': 'pl_stop',
-    });
     // Pre-empt the expected state so the button feels more responsive
     setState(() {
       state = 'stopped';
       time = Duration.zero;
       length = Duration.zero;
+    });
+    _statusRequest({
+      'command': 'pl_stop',
     });
   }
 
@@ -297,8 +309,20 @@ class _RemoteControlState extends State<RemoteControl> {
             padding: EdgeInsets.symmetric(horizontal: 14),
             child: Row(
               children: <Widget>[
-                Text(
-                  state != 'stopped' ? formatTime(time) : '––:––',
+                Builder(
+                  builder: (context) => GestureDetector(
+                        onTap: () {
+                          _togglePolling(context);
+                        },
+                        child: Text(
+                          state != 'stopped' ? formatTime(time) : '––:––',
+                          style: TextStyle(
+                            color: ticker.isActive
+                                ? Theme.of(context).textTheme.body1.color
+                                : Theme.of(context).disabledColor,
+                          ),
+                        ),
+                      ),
                 ),
                 Flexible(
                     flex: 1,

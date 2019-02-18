@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:xml/xml.dart' as xml;
 
 import 'utils.dart';
 
@@ -183,6 +184,7 @@ class BrowseResult {
   BrowseResult(this.item, this.playlist);
 }
 
+// ignore: unused_element
 const _emulatorLocalhost = '10.0.2.2';
 
 const _defaultPort = '8080';
@@ -281,5 +283,29 @@ class Settings {
 
   save() {
     _prefs.setString('settings', jsonEncode(this));
+  }
+}
+
+class VlcStatusResponse {
+  xml.XmlDocument document;
+
+  VlcStatusResponse(this.document);
+
+  String get state => document.findAllElements('state').first.text;
+
+  Duration get time => Duration(
+      seconds: int.tryParse(document.findAllElements('time').first.text));
+
+  Duration get length => Duration(
+      seconds: int.tryParse(document.findAllElements('length').first.text));
+
+  String get title {
+    Map<String, String> titles = Map.fromIterable(
+      document.findAllElements('info').where(
+          (el) => ['title', 'filename'].contains(el.getAttribute('name'))),
+      key: (el) => el.getAttribute('name'),
+      value: (el) => el.text,
+    );
+    return titles['title'] ?? titles['filename'] ?? '';
   }
 }
