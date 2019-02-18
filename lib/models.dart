@@ -214,6 +214,8 @@ class Connection {
   bool get isValid =>
       _ipError == null && _portError == null && _passwordError == null;
 
+  bool get isNotValid => !isValid;
+
   set ip(String value) {
     if (value.trim().isEmpty) {
       _ipError = 'An IP address is required';

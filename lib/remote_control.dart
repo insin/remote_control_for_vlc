@@ -93,7 +93,7 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _tick(timer) async {
-    if (!widget.settings.connection.isValid) {
+    if (widget.settings.connection.isNotValid) {
       return;
     }
 
