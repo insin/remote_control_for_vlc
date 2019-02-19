@@ -36,6 +36,7 @@ class _RemoteControlState extends State<RemoteControl> {
   Timer ticker;
   bool showTimeLeft = false;
   bool sliding = false;
+  bool skipNextStatus = false;
 
   BrowseItem playing;
   List<BrowseItem> playlist;
@@ -121,7 +122,13 @@ class _RemoteControlState extends State<RemoteControl> {
       return;
     }
 
+    if (skipNextStatus) {
+      skipNextStatus = false;
+      return;
+    }
+
     var response = await _statusRequest();
+
     // TODO Try to detect if the playing file was changed from VLC itself and switch back to default display
     setState(() {
       state = response.state;
@@ -159,17 +166,13 @@ class _RemoteControlState extends State<RemoteControl> {
     }
   }
 
-  _play(BrowseItem item) async {
-    var response = await _statusRequest({
+  _play(BrowseItem item) {
+    _statusRequest({
       'command': 'in_play',
       'input': item.uri,
     });
     setState(() {
       playing = item;
-      state = response.state;
-      time = response.time;
-      length = response.length;
-      title = response.title;
     });
   }
 
@@ -197,13 +200,10 @@ class _RemoteControlState extends State<RemoteControl> {
     // Pre-empt the expected state so the button feels more responsive
     setState(() {
       state = (state == 'playing' ? 'paused' : 'playing');
+      skipNextStatus = true;
     });
     var response = await _statusRequest({
       'command': 'pl_pause',
-    });
-    setState(() {
-      state = response.state;
-      time = response.time;
     });
   }
 
