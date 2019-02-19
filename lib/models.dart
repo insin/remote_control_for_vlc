@@ -139,21 +139,8 @@ class BrowseItem {
     this.uri,
   );
 
-  BrowseItem.fromJson(Map<String, dynamic> json)
-      : type = json['type'],
-        name = json['name'],
-        path = json['path'],
-        uri = json['uri'];
-
-  Map<String, dynamic> toJson() => {
-        'type': type,
-        'name': name,
-        'path': path,
-        'uri': uri,
-      };
-
   IconData get icon {
-    if (type == 'dir') {
+    if (isDir) {
       return Icons.folder;
     }
 
@@ -170,11 +157,30 @@ class BrowseItem {
 
   bool get isAudio => _audioExtensions.hasMatch(path);
 
+  bool get isDir => type == 'dir';
+
+  bool get isFile => type == 'file';
+
   bool get isVideo => _videoExtensions.hasMatch(path);
 
   bool get isSupportedMedia => isAudio || isVideo;
 
-  String get title => cleanTitle(name, keepExt: type == 'file');
+  String get title => cleanTitle(name, keepExt: isFile);
+
+  BrowseItem.fromJson(Map<String, dynamic> json)
+      : type = json['type'],
+        name = json['name'],
+        path = json['path'],
+        uri = json['uri'];
+
+  Map<String, dynamic> toJson() => {
+        'type': type,
+        'name': name,
+        'path': path,
+        'uri': uri,
+      };
+
+  String toString() => 'BrowseItem(${toJson()})';
 }
 
 class BrowseResult {
@@ -307,5 +313,14 @@ class VlcStatusResponse {
       value: (el) => el.text,
     );
     return titles['title'] ?? titles['filename'] ?? '';
+  }
+
+  String toString() {
+    return 'VlcResponse(${{
+      'state': state,
+      'time': time,
+      'length': length,
+      'title': title
+    }})';
   }
 }

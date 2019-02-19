@@ -66,7 +66,8 @@ class _FileBrowserState extends State<FileBrowser> {
           return;
         }
 
-        if (item.type == 'dir') {
+        if (item.isDir) {
+          // Float directories to the top
           items.insert(dirIndex++, item);
         } else if (item.isSupportedMedia) {
           items.add(item);
@@ -81,7 +82,7 @@ class _FileBrowserState extends State<FileBrowser> {
   }
 
   _handleTap(BrowseItem item) async {
-    if (item.type == 'dir') {
+    if (item.isDir) {
       BrowseResult result = await Navigator.push(
         context,
         MaterialPageRoute(
@@ -101,7 +102,7 @@ class _FileBrowserState extends State<FileBrowser> {
         context,
         BrowseResult(
           item,
-          _items.where((i) => i.type == 'file').toList(),
+          _items.where((i) => i.isFile).toList(),
         ),
       );
     }
@@ -166,7 +167,7 @@ class _FileBrowserState extends State<FileBrowser> {
         );
       },
       separatorBuilder: (context, i) {
-        if (_items[i].type == 'dir' && _items[i + 1]?.type == 'file') {
+        if (_items[i].isDir && _items[i + 1]?.isFile) {
           return Divider();
         }
         return SizedBox.shrink();
