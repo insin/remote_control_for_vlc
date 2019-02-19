@@ -54,8 +54,17 @@ class _RemoteControlState extends State<RemoteControl> {
                 utf8.encode(':${widget.settings.connection.password}')),
       },
     );
+    assert(() {
+      print('VlcStatusRequest(${queryParameters ?? {}})');
+      return true;
+    }());
     if (response.statusCode == 200) {
-      return VlcStatusResponse(xml.parse(response.body));
+      var statusResponse = VlcStatusResponse(xml.parse(response.body));
+      assert(() {
+        print(statusResponse);
+        return true;
+      }());
+      return statusResponse;
     }
     return null;
   }
@@ -143,6 +152,10 @@ class _RemoteControlState extends State<RemoteControl> {
         playing = result.item;
         playlist = result.playlist;
       });
+      assert(() {
+        print('Playing ${result.item}');
+        return true;
+      }());
     }
   }
 
