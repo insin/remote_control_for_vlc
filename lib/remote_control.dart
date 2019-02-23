@@ -28,6 +28,8 @@ class RemoteControl extends StatefulWidget {
 }
 
 class _RemoteControlState extends State<RemoteControl> {
+  http.Client client = http.Client();
+  int lastStatusCode;
   String state = 'stopped';
   String title = '';
   Duration time = Duration.zero;
@@ -41,25 +43,51 @@ class _RemoteControlState extends State<RemoteControl> {
   BrowseItem playing;
   List<BrowseItem> playlist;
 
+  @override
+  initState() {
+    ticker = new Timer.periodic(Duration(seconds: 1), _tick);
+    super.initState();
+    _checkWifi();
+  }
+
+  @override
+  dispose() {
+    if (ticker.isActive) {
+      ticker.cancel();
+    }
+    super.dispose();
+  }
+
   Future<VlcStatusResponse> _statusRequest(
       [Map<String, String> queryParameters]) async {
-    var response = await http.get(
-      Uri.http(
-        widget.settings.connection.authority,
-        '/requests/status.xml',
-        queryParameters,
-      ),
-      headers: {
-        'Authorization': 'Basic ' +
-            base64Encode(
-                utf8.encode(':${widget.settings.connection.password}')),
-      },
-    );
-    assert(() {
-      print('VlcStatusRequest(${queryParameters ?? {}})');
-      return true;
-    }());
-    if (response.statusCode == 200) {
+    http.Response response;
+    try {
+      assert(() {
+        print('VlcStatusRequest(${queryParameters ?? {}})');
+        return true;
+      }());
+      response = await client.get(
+        Uri.http(
+          widget.settings.connection.authority,
+          '/requests/status.xml',
+          queryParameters,
+        ),
+        headers: {
+          'Authorization': 'Basic ' +
+              base64Encode(
+                  utf8.encode(':${widget.settings.connection.password}')),
+        },
+      ).timeout(Duration(seconds: 1));
+    } catch (e) {
+      assert(() {
+        print('Error: ${e.runtimeType}');
+        return true;
+      }());
+    }
+    setState(() {
+      lastStatusCode = response?.statusCode ?? -1;
+    });
+    if (response?.statusCode == 200) {
       var statusResponse = VlcStatusResponse(xml.parse(response.body));
       assert(() {
         print(statusResponse);
@@ -68,13 +96,6 @@ class _RemoteControlState extends State<RemoteControl> {
       return statusResponse;
     }
     return null;
-  }
-
-  @override
-  initState() {
-    ticker = new Timer.periodic(Duration(seconds: 1), _tick);
-    super.initState();
-    _checkWifi();
   }
 
   _togglePolling(context) {
@@ -129,6 +150,10 @@ class _RemoteControlState extends State<RemoteControl> {
 
     var response = await _statusRequest();
 
+    if (response == null) {
+      return;
+    }
+
     // TODO Try to detect if the playing file was changed from VLC itself and switch back to default display
     setState(() {
       state = response.state;
@@ -151,10 +176,13 @@ class _RemoteControlState extends State<RemoteControl> {
     );
 
     if (result != null) {
-      _statusRequest({
+      var response = await _statusRequest({
         'command': 'in_play',
         'input': result.item.uri,
       });
+      if (response == null) {
+        return;
+      }
       setState(() {
         playing = result.item;
         playlist = result.playlist;
@@ -166,11 +194,14 @@ class _RemoteControlState extends State<RemoteControl> {
     }
   }
 
-  _play(BrowseItem item) {
-    _statusRequest({
+  _play(BrowseItem item) async {
+    var response = await _statusRequest({
       'command': 'in_play',
       'input': item.uri,
     });
+    if (response == null) {
+      return;
+    }
     setState(() {
       playing = item;
     });
@@ -181,6 +212,9 @@ class _RemoteControlState extends State<RemoteControl> {
       'command': 'seek',
       'val': '$percent%',
     });
+    if (response == null) {
+      return;
+    }
     setState(() {
       time = response.time;
     });
@@ -191,6 +225,9 @@ class _RemoteControlState extends State<RemoteControl> {
       'command': 'seek',
       'val': '''${seekTime > 0 ? '+' : ''}${seekTime}S''',
     });
+    if (response == null) {
+      return;
+    }
     setState(() {
       time = response.time;
     });
@@ -202,7 +239,7 @@ class _RemoteControlState extends State<RemoteControl> {
       state = (state == 'playing' ? 'paused' : 'playing');
       skipNextStatus = true;
     });
-    var response = await _statusRequest({
+    _statusRequest({
       'command': 'pl_pause',
     });
   }
@@ -281,7 +318,9 @@ class _RemoteControlState extends State<RemoteControl> {
       return Expanded(
         child: Padding(
           padding: EdgeInsets.all(32),
-          child: Image.asset('assets/icon-512.png'),
+          child: lastStatusCode == 200
+              ? Image.asset('assets/icon-512.png')
+              : ConnectionAnimation(),
         ),
       );
     }
@@ -434,6 +473,58 @@ class _RemoteControlState extends State<RemoteControl> {
           )
         ],
       ),
+    );
+  }
+}
+
+class ConnectionAnimation extends StatefulWidget {
+  @override
+  State<StatefulWidget> createState() => _ConnectionAnimationState();
+}
+
+class _ConnectionAnimationState extends State<ConnectionAnimation>
+    with TickerProviderStateMixin {
+  AnimationController _controller;
+  Animation<int> _animation;
+
+  @override
+  void initState() {
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat();
+    _animation = new IntTween(begin: 0, end: 3).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    ));
+    super.initState();
+  }
+
+  @override
+  dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: AlignmentDirectional.center,
+      children: <Widget>[
+        Image.asset('assets/cone.png'),
+        AnimatedBuilder(
+          animation: _animation,
+          builder: (BuildContext context, Widget child) {
+            return Image.asset(
+              'assets/signal-${_animation.value}.png',
+            );
+          },
+        ),
+        Positioned(
+          bottom: 0,
+          child: Text('Trying to connect to VLC...'),
+        )
+      ],
     );
   }
 }

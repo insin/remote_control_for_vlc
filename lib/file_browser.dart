@@ -25,6 +25,8 @@ class FileBrowser extends StatefulWidget {
 
 class _FileBrowserState extends State<FileBrowser> {
   bool _loading = false;
+  String _errorMessage;
+  String _errorDetail;
   List<BrowseItem> _items = [];
 
   @override
@@ -38,16 +40,27 @@ class _FileBrowserState extends State<FileBrowser> {
       _loading = true;
     });
 
-    var response = await http.get(
-      Uri.http(widget.settings.connection.authority, '/requests/browse.xml', {
-        'uri': dir.uri,
-      }),
-      headers: {
-        'Authorization': 'Basic ' +
-            base64Encode(
-                utf8.encode(':${widget.settings.connection.password}')),
-      },
-    );
+    http.Response response;
+
+    try {
+      response = await http.get(
+        Uri.http(widget.settings.connection.authority, '/requests/browse.xml', {
+          'uri': dir.uri,
+        }),
+        headers: {
+          'Authorization': 'Basic ' +
+              base64Encode(
+                  utf8.encode(':${widget.settings.connection.password}')),
+        },
+      ).timeout(Duration(seconds: 2));
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error connecting to VLC';
+        _errorDetail = e.runtimeType.toString();
+        _loading = false;
+      });
+      return;
+    }
 
     List<BrowseItem> items = [];
     var dirIndex = 0;
@@ -139,6 +152,25 @@ class _FileBrowserState extends State<FileBrowser> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[CircularProgressIndicator()],
+        ),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            ListTile(
+              leading: Icon(
+                Icons.error,
+                color: Colors.redAccent,
+                size: 48,
+              ),
+              title: Text(_errorMessage),
+              subtitle: Text(_errorDetail),
+            ),
+          ],
         ),
       );
     }

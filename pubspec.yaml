@@ -23,3 +23,8 @@ flutter:
 
   assets:
     - assets/icon-512.png
+    - assets/cone.png
+    - assets/signal-0.png
+    - assets/signal-1.png
+    - assets/signal-2.png
+    - assets/signal-3.png

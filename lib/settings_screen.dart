@@ -134,10 +134,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String description;
     IconData icon;
 
-    var client = http.Client();
-
     try {
-      var response = await client.get(
+      var response = await http.get(
           Uri.http(
             '${ipController.text}:${portController.text}',
             '/requests/status.xml',
@@ -145,7 +143,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           headers: {
             'Authorization': 'Basic ' +
                 base64Encode(utf8.encode(':${passwordController.text}'))
-          }).timeout(Duration(seconds: 5));
+          }).timeout(Duration(seconds: 2));
 
       if (response.statusCode == 200) {
         widget.settings.connection = connection;
