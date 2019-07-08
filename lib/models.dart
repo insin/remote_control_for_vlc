@@ -292,8 +292,21 @@ class Settings {
   }
 }
 
+class LanguageTrack {
+  String language;
+  int streamNumber;
+
+  LanguageTrack(this.language, this.streamNumber);
+
+  String toString() {
+    return '$language ($streamNumber)';
+  }
+}
+
 class VlcStatusResponse {
   xml.XmlDocument document;
+  List<LanguageTrack> _audioTracks;
+  List<LanguageTrack> _subtitleTracks;
 
   VlcStatusResponse(this.document);
 
@@ -315,12 +328,46 @@ class VlcStatusResponse {
     return titles['title'] ?? titles['filename'] ?? '';
   }
 
+  bool get fullscreen =>
+      document.findAllElements('fullscreen').first.text == 'true';
+
+  List<LanguageTrack> get audioTracks {
+    if (_audioTracks == null) {
+      _audioTracks = _getLanguageTracks('Audio');
+    }
+    return _audioTracks;
+  }
+
+  List<LanguageTrack> get subtitleTracks {
+    if (_subtitleTracks == null) {
+      _subtitleTracks = _getLanguageTracks('Subtitle');
+    }
+    return _subtitleTracks;
+  }
+
+  List<LanguageTrack> _getLanguageTracks(String type) {
+    List<LanguageTrack> tracks = [];
+    document.findAllElements('category').forEach((category) {
+      Map<String, String> info = Map.fromIterable(category.findElements('info'),
+          key: (info) => info.getAttribute('name'), value: (info) => info.text);
+      if (info['Type'] == type) {
+        tracks.add(new LanguageTrack(info['Language'],
+            int.parse(category.getAttribute('name').split(' ').last)));
+      }
+    });
+    tracks.sort((a, b) => a.streamNumber - b.streamNumber);
+    return tracks;
+  }
+
   String toString() {
     return 'VlcResponse(${{
       'state': state,
       'time': time,
       'length': length,
-      'title': title
+      'title': title,
+      'fullscreen': fullscreen,
+      'audioTracks': audioTracks,
+      'subtitleTracks': subtitleTracks,
     }})';
   }
 }

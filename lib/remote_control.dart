@@ -14,6 +14,8 @@ import 'utils.dart';
 
 var headerFooterBgColor = Colors.grey.shade200.withOpacity(0.75);
 
+enum PopupMenuChoice { AUDIO_TRACK, FULLSCREEN, SUBTITLE_TRACK }
+
 class RemoteControl extends StatefulWidget {
   final SharedPreferences prefs;
   final Settings settings;
@@ -30,6 +32,7 @@ class RemoteControl extends StatefulWidget {
 class _RemoteControlState extends State<RemoteControl> {
   http.Client client = http.Client();
   int lastStatusCode;
+  VlcStatusResponse lastStatusResponse;
   String state = 'stopped';
   String title = '';
   Duration time = Duration.zero;
@@ -151,6 +154,7 @@ class _RemoteControlState extends State<RemoteControl> {
     var response = await _statusRequest();
 
     if (response == null) {
+      lastStatusResponse = response;
       return;
     }
 
@@ -162,6 +166,7 @@ class _RemoteControlState extends State<RemoteControl> {
       if (!sliding) {
         time = response.time;
       }
+      lastStatusResponse = response;
     });
   }
 
@@ -263,6 +268,66 @@ class _RemoteControlState extends State<RemoteControl> {
     return (time.inSeconds / length.inSeconds * 100);
   }
 
+  Future<LanguageTrack> _chooseLanguageTrack(List<LanguageTrack> options) {
+    return showDialog<LanguageTrack>(
+      context: context,
+      builder: (BuildContext context) {
+        return SimpleDialog(
+          children: options
+              .map((option) => SimpleDialogOption(
+                    onPressed: () {
+                      Navigator.pop(context, option);
+                    },
+                    child: Text(option.language),
+                  ))
+              .toList(),
+        );
+      },
+    );
+  }
+
+  void _chooseSubtitleTrack() async {
+    LanguageTrack subtitleTrack =
+        await _chooseLanguageTrack(lastStatusResponse.subtitleTracks);
+    if (subtitleTrack != null) {
+      _statusRequest({
+        'command': 'subtitle_track',
+        'val': subtitleTrack.streamNumber.toString(),
+      });
+    }
+  }
+
+  void _chooseAudioTrack() async {
+    LanguageTrack audioTrack =
+        await _chooseLanguageTrack(lastStatusResponse.audioTracks);
+    if (audioTrack != null) {
+      _statusRequest({
+        'command': 'audio_track',
+        'val': audioTrack.streamNumber.toString(),
+      });
+    }
+  }
+
+  void _toggleFullScreen() {
+    _statusRequest({
+      'command': 'fullscreen',
+    });
+  }
+
+  void _onPopupMenuChoice(PopupMenuChoice choice) {
+    switch (choice) {
+      case PopupMenuChoice.AUDIO_TRACK:
+        _chooseAudioTrack();
+        break;
+      case PopupMenuChoice.FULLSCREEN:
+        _toggleFullScreen();
+        break;
+      case PopupMenuChoice.SUBTITLE_TRACK:
+        _chooseSubtitleTrack();
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -282,23 +347,56 @@ class _RemoteControlState extends State<RemoteControl> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  trailing: IconButton(
-                    icon: Icon(Icons.settings),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => SettingsScreen(
-                                settings: widget.settings,
-                                onSettingsChanged: () {
-                                  setState(() {
-                                    widget.settings.save();
-                                  });
-                                },
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.settings),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SettingsScreen(
+                                    settings: widget.settings,
+                                    onSettingsChanged: () {
+                                      setState(() {
+                                        widget.settings.save();
+                                      });
+                                    },
+                                  ),
+                            ),
+                          );
+                        },
+                      ),
+                      Visibility(
+                        visible: lastStatusCode == 200,
+                        child: PopupMenuButton<PopupMenuChoice>(
+                          onSelected: _onPopupMenuChoice,
+                          itemBuilder: (context) {
+                            return [
+                              PopupMenuItem(
+                                child: Text('Select subtitle track'),
+                                value: PopupMenuChoice.SUBTITLE_TRACK,
+                                enabled:
+                                    (lastStatusResponse?.subtitleTracks ?? [])
+                                        .isNotEmpty,
                               ),
+                              PopupMenuItem(
+                                child: Text('Select audio track'),
+                                value: PopupMenuChoice.AUDIO_TRACK,
+                                enabled: (lastStatusResponse?.audioTracks ?? [])
+                                    .isNotEmpty,
+                              ),
+                              PopupMenuItem(
+                                child: Text('Toggle fullscreen'),
+                                value: PopupMenuChoice.FULLSCREEN,
+                                enabled: lastStatusResponse != null,
+                              ),
+                            ];
+                          },
                         ),
-                      );
-                    },
+                      )
+                    ],
                   ),
                 ),
               ),
