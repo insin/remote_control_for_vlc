@@ -236,14 +236,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               isDense: widget.settings.dense,
               icon: Icon(Icons.vpn_key),
               suffixIcon: GestureDetector(
-                onLongPress: () {
+                onTap: () {
                   setState(() {
-                    showPassword = true;
-                  });
-                },
-                onLongPressUp: () {
-                  setState(() {
-                    showPassword = false;
+                    showPassword = !showPassword;
                   });
                 },
                 child: Icon(Icons.remove_red_eye),
