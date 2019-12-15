@@ -335,6 +335,15 @@ class VlcStatusResponse {
   bool get random =>
       document.findAllElements('random').first.text == 'true';
 
+  bool get loop =>
+      document.findAllElements('loop').first.text == 'true';
+
+  String get currentPlId =>
+      document.findAllElements('currentplid').first.text;
+
+  String get version =>
+      document.findAllElements('version').first.text;
+
   List<LanguageTrack> get audioTracks {
     if (_audioTracks == null) {
       _audioTracks = _getLanguageTracks('Audio');
@@ -375,6 +384,9 @@ class VlcStatusResponse {
       'fullscreen': fullscreen,
       'repeat': repeat,
       'random': random,
+      'loop': loop,
+      'currentPlId': currentPlId,
+      'version': version,
       'audioTracks': audioTracks,
       'subtitleTracks': subtitleTracks,
     }})';

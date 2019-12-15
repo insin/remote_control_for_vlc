@@ -15,7 +15,7 @@ import 'utils.dart';
 var headerFooterBgColor = Colors.grey.shade200.withOpacity(0.75);
 
 enum PopupMenuChoice { AUDIO_TRACK, FULLSCREEN, SUBTITLE_TRACK,
-  RANDOM_PLAY, REPEAT, EMPTY_PLAYLIST }
+  RANDOM_PLAY, REPEAT, LOOP, EMPTY_PLAYLIST }
 
 class RemoteControl extends StatefulWidget {
   final SharedPreferences prefs;
@@ -310,6 +310,15 @@ class _RemoteControlState extends State<RemoteControl> {
     }
   }
 
+  _toggleLoop() async {
+    var response = await _statusRequest({
+      'command': 'pl_loop'
+    });
+    if (response == null) {
+      return;
+    }
+  }
+
   _seekPercent(int percent) async {
     var response = await _statusRequest({
       'command': 'seek',
@@ -429,6 +438,9 @@ class _RemoteControlState extends State<RemoteControl> {
       case PopupMenuChoice.REPEAT:
         _toggleRepeat();
         break;
+      case PopupMenuChoice.LOOP:
+        _toggleLoop();
+        break;
       case PopupMenuChoice.EMPTY_PLAYLIST:
         _emptyPlaylist();
         break;
@@ -448,9 +460,9 @@ class _RemoteControlState extends State<RemoteControl> {
                 child: ListTile(
                   contentPadding: EdgeInsets.only(left: 14),
                   dense: widget.settings.dense,
-                  title: Text(playing == null && title.isEmpty ? 'VLC Remote' :
-                    playing?.title ??
-                        cleanTitle(title.split(new RegExp(r'[\\/]')).last),
+                  title: Text(playing == null && title.isEmpty ? 'VLC Remote' +
+                      (lastStatusResponse != null ? ' (${lastStatusResponse.version})' : '')
+                        : playing?.title ?? cleanTitle(title.split(new RegExp(r'[\\/]')).last),
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
@@ -510,6 +522,12 @@ class _RemoteControlState extends State<RemoteControl> {
                                 child: Text('Turn repeat '
                                   '${lastStatusResponse.repeat ? 'OFF' : 'ON'}'),
                                 value: PopupMenuChoice.REPEAT,
+                                enabled: lastStatusResponse != null,
+                              ),
+                              PopupMenuItem(
+                                child: Text('Turn looping '
+                                    '${lastStatusResponse.loop ? 'OFF' : 'ON'}'),
+                                value: PopupMenuChoice.LOOP,
                                 enabled: lastStatusResponse != null,
                               ),
                               PopupMenuItem(
