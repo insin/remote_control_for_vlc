@@ -14,7 +14,8 @@ import 'utils.dart';
 
 var headerFooterBgColor = Colors.grey.shade200.withOpacity(0.75);
 
-enum PopupMenuChoice { AUDIO_TRACK, FULLSCREEN, SUBTITLE_TRACK }
+enum PopupMenuChoice { AUDIO_TRACK, FULLSCREEN, SUBTITLE_TRACK,
+  RANDOM_PLAY, REPEAT, EMPTY_PLAYLIST }
 
 class RemoteControl extends StatefulWidget {
   final SharedPreferences prefs;
@@ -43,8 +44,8 @@ class _RemoteControlState extends State<RemoteControl> {
   bool sliding = false;
   bool skipNextStatus = false;
 
-  BrowseItem playing;
-  List<BrowseItem> playlist;
+  List<PlaylistItem> playlist;
+  PlaylistItem playing;
 
   @override
   initState() {
@@ -63,16 +64,47 @@ class _RemoteControlState extends State<RemoteControl> {
 
   Future<VlcStatusResponse> _statusRequest(
       [Map<String, String> queryParameters]) async {
-    http.Response response;
-    try {
+    assert(() {
+      print('VlcStatusRequest(${queryParameters ?? {}})');
+      return true;
+    }());
+    xml.XmlDocument document = await _serverRequest('status', queryParameters);
+    if (document != null) {
+      var statusResponse = VlcStatusResponse(document);
       assert(() {
-        print('VlcStatusRequest(${queryParameters ?? {}})');
+        print(statusResponse);
         return true;
       }());
+      return statusResponse;
+    }
+    return null;
+  }
+
+  Future<VlcPlaylistResponse> _playlistRequest() async {
+    assert(() {
+      print('VlcPlaylistRequest()');
+      return true;
+    }());
+    xml.XmlDocument document = await _serverRequest('playlist', null);
+    if (document != null) {
+      var playlistResponse = VlcPlaylistResponse(document);
+      assert(() {
+        print(playlistResponse);
+        return true;
+      }());
+      return playlistResponse;
+    }
+    return null;
+  }
+
+  Future<xml.XmlDocument> _serverRequest(String requestType,
+      [Map<String, String> queryParameters]) async {
+    http.Response response;
+    try {
       response = await client.get(
         Uri.http(
           widget.settings.connection.authority,
-          '/requests/status.xml',
+          '/requests/$requestType.xml',
           queryParameters,
         ),
         headers: {
@@ -91,12 +123,7 @@ class _RemoteControlState extends State<RemoteControl> {
       lastStatusCode = response?.statusCode ?? -1;
     });
     if (response?.statusCode == 200) {
-      var statusResponse = VlcStatusResponse(xml.parse(response.body));
-      assert(() {
-        print(statusResponse);
-        return true;
-      }());
-      return statusResponse;
+      return xml.parse(response.body);
     }
     return null;
   }
@@ -188,10 +215,6 @@ class _RemoteControlState extends State<RemoteControl> {
       if (response == null) {
         return;
       }
-      setState(() {
-        playing = result.item;
-        playlist = result.playlist;
-      });
       assert(() {
         print('Playing ${result.item}');
         return true;
@@ -201,15 +224,90 @@ class _RemoteControlState extends State<RemoteControl> {
 
   _play(BrowseItem item) async {
     var response = await _statusRequest({
-      'command': 'in_play',
-      'input': item.uri,
+      'command': 'pl_play',
+      'id': item.id,
     });
     if (response == null) {
       return;
     }
-    setState(() {
-      playing = item;
+  }
+
+  _previous() async {
+    var response = await _statusRequest({
+      'command': 'pl_previous'
     });
+    if (response == null) {
+      return;
+    }
+  }
+
+  _next() async {
+    var response = await _statusRequest({
+      'command': 'pl_next'
+    });
+    if (response == null) {
+      return;
+    }
+  }
+
+  _delete(PlaylistItem item) async {
+    showDialog(context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: new Text('Remove item from playlist?'),
+          content: new Text(item.title),
+          actions: <Widget>[
+            FlatButton(
+              child: Text("No"),
+              onPressed: () {
+                Navigator.pop(context);
+              }
+            ),
+            FlatButton(
+              child: Text("Yes"),
+              autofocus: true,
+              onPressed: () {
+                var response = _statusRequest({
+                  'command': 'pl_delete',
+                  'id': item.id,
+                });
+                if (response == null) {
+                  return;
+                }
+                Navigator.pop(context);
+              }
+            )
+          ],
+        );
+      }
+    );
+  }
+
+  _emptyPlaylist() async {
+    var response = await _statusRequest({
+      'command': 'pl_empty'
+    });
+    if (response == null) {
+      return;
+    }
+  }
+
+  _toggleRandom() async {
+    var response = await _statusRequest({
+      'command': 'pl_random'
+    });
+    if (response == null) {
+      return;
+    }
+  }
+
+  _toggleRepeat() async {
+    var response = await _statusRequest({
+      'command': 'pl_repeat'
+    });
+    if (response == null) {
+      return;
+    }
   }
 
   _seekPercent(int percent) async {
@@ -325,6 +423,15 @@ class _RemoteControlState extends State<RemoteControl> {
       case PopupMenuChoice.SUBTITLE_TRACK:
         _chooseSubtitleTrack();
         break;
+      case PopupMenuChoice.RANDOM_PLAY:
+        _toggleRandom();
+        break;
+      case PopupMenuChoice.REPEAT:
+        _toggleRepeat();
+        break;
+      case PopupMenuChoice.EMPTY_PLAYLIST:
+        _emptyPlaylist();
+        break;
     }
   }
 
@@ -341,9 +448,9 @@ class _RemoteControlState extends State<RemoteControl> {
                 child: ListTile(
                   contentPadding: EdgeInsets.only(left: 14),
                   dense: widget.settings.dense,
-                  title: Text(
+                  title: Text(playing == null && title.isEmpty ? 'VLC Remote' :
                     playing?.title ??
-                        cleanTitle(title.split(new RegExp(r'[\\\/]')).last),
+                        cleanTitle(title.split(new RegExp(r'[\\/]')).last),
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
@@ -388,8 +495,26 @@ class _RemoteControlState extends State<RemoteControl> {
                                     .isNotEmpty,
                               ),
                               PopupMenuItem(
-                                child: Text('Toggle fullscreen'),
+                                child: Text('Turn fullscreen '
+                                  '${lastStatusResponse.fullscreen ? 'OFF' : 'ON'}'),
                                 value: PopupMenuChoice.FULLSCREEN,
+                                enabled: lastStatusResponse != null,
+                              ),
+                              PopupMenuItem(
+                                child: Text('Turn random play '
+                                  '${lastStatusResponse.random ? 'OFF' : 'ON'}'),
+                                value: PopupMenuChoice.RANDOM_PLAY,
+                                enabled: lastStatusResponse != null,
+                              ),
+                              PopupMenuItem(
+                                child: Text('Turn repeat '
+                                  '${lastStatusResponse.repeat ? 'OFF' : 'ON'}'),
+                                value: PopupMenuChoice.REPEAT,
+                                enabled: lastStatusResponse != null,
+                              ),
+                              PopupMenuItem(
+                                child: Text('Clear playlist'),
+                                value: PopupMenuChoice.EMPTY_PLAYLIST,
                                 enabled: lastStatusResponse != null,
                               ),
                             ];
@@ -412,7 +537,8 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   Widget _body() {
-    if (playlist == null) {
+    _getPlaylist();
+    if (playlist == null || playlist.isEmpty) {
       return Expanded(
         child: Padding(
           padding: EdgeInsets.all(32),
@@ -428,11 +554,11 @@ class _RemoteControlState extends State<RemoteControl> {
         itemCount: playlist.length,
         itemBuilder: (context, index) {
           var item = playlist[index];
-          var isPlaying = item.path == playing.path;
+          var isPlaying = item.current;
           return ListTile(
             dense: widget.settings.dense,
             selected: isPlaying,
-            leading: Icon(item.icon),
+            leading: isPlaying ? Icon(Icons.play_arrow) : Icon(Icons.stop),
             title: Text(
               item.title,
               overflow: TextOverflow.ellipsis,
@@ -442,6 +568,9 @@ class _RemoteControlState extends State<RemoteControl> {
             ),
             onTap: () {
               _play(item);
+            },
+            onLongPress: () {
+              _delete(item);
             },
           );
         },
@@ -531,6 +660,14 @@ class _RemoteControlState extends State<RemoteControl> {
                 Expanded(child: VerticalDivider()),
                 GestureDetector(
                   child: Icon(
+                    Icons.skip_previous,
+                    size: 30,
+                  ),
+                  onTap: _previous,
+                ),
+                Expanded(child: VerticalDivider()),
+                GestureDetector(
+                  child: Icon(
                     Icons.fast_rewind,
                     size: 30,
                   ),
@@ -557,6 +694,14 @@ class _RemoteControlState extends State<RemoteControl> {
                   onTap: () {
                     _seekRelative(10);
                   },
+                ),
+                Expanded(child: VerticalDivider()),
+                GestureDetector(
+                  child: Icon(
+                    Icons.skip_next,
+                    size: 30,
+                  ),
+                  onTap: _next,
                 ),
                 Expanded(child: VerticalDivider()),
                 GestureDetector(

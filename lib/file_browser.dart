@@ -113,10 +113,7 @@ class _FileBrowserState extends State<FileBrowser> {
     } else {
       Navigator.pop(
         context,
-        BrowseResult(
-          item,
-          _items.where((i) => i.isFile).toList(),
-        ),
+        BrowseResult(item)
       );
     }
   }
