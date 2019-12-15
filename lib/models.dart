@@ -354,7 +354,8 @@ class VlcStatusResponse {
     document.findAllElements('category').forEach((category) {
       Map<String, String> info = Map.fromIterable(category.findElements('info'),
           key: (info) => info.getAttribute('name'), value: (info) => info.text);
-      if (info['Type'] == type) {
+      if (info['Type'] == type && info['Language'] != null &&
+          info['Language'].isNotEmpty) {
         tracks.add(new LanguageTrack(info['Language'],
             int.parse(category.getAttribute('name').split(' ').last)));
       }
