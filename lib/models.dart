@@ -354,10 +354,12 @@ class VlcStatusResponse {
     document.findAllElements('category').forEach((category) {
       Map<String, String> info = Map.fromIterable(category.findElements('info'),
           key: (info) => info.getAttribute('name'), value: (info) => info.text);
-      if (info['Type'] == type && info['Language'] != null &&
-          info['Language'].isNotEmpty) {
-        tracks.add(new LanguageTrack(info['Language'],
-            int.parse(category.getAttribute('name').split(' ').last)));
+      if (info['Type'] == type) {
+        var lang = info['Language'];
+        if (lang != null && lang.isNotEmpty) {
+          tracks.add(new LanguageTrack(lang,
+              int.parse(category.getAttribute('name').split(' ').last)));
+        }
       }
     });
     tracks.sort((a, b) => a.streamNumber - b.streamNumber);
