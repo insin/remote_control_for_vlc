@@ -572,20 +572,26 @@ class _RemoteControlState extends State<RemoteControl> {
         itemCount: playlist.length,
         itemBuilder: (context, index) {
           var item = playlist[index];
-          var isPlaying = item.current;
+          var isCurrent = item.current;
+          var isPlaying = state == 'playing';
           return ListTile(
             dense: widget.settings.dense,
-            selected: isPlaying,
-            leading: isPlaying ? Icon(Icons.play_arrow) : Icon(Icons.stop),
+            selected: isCurrent,
+            leading: !isCurrent ? Icon(Icons.stop) :
+              (isPlaying ? Icon(Icons.play_arrow) : Icon(Icons.pause)),
             title: Text(
               item.title,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal,
+                fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
               ),
             ),
             onTap: () {
-              _play(item);
+              if (isCurrent) {
+                isPlaying ? _pause() : _play(item);
+              } else {
+                _play(item);
+              }
             },
             onLongPress: () {
               _delete(item);
