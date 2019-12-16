@@ -211,10 +211,6 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _updateStateAndPlaylist() async {
-    if (widget.settings.connection.isNotValid) {
-      return;
-    }
-
     var statusResponse = await _statusRequest();
     var playlistResponse = await _playlistRequest();
 
