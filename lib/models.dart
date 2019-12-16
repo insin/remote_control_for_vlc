@@ -466,12 +466,12 @@ class VlcPlaylistResponse {
   PlaylistItem currentItem;
   
   List<PlaylistItem> get playListItems {
-    return document.rootElement.findAllElements('leaf')
+    var items = document.rootElement.findAllElements('leaf')
         .map((el) {
-      PlaylistItem item = PlaylistItem(el);
-      currentItem = item.current ? item : null;
-      return item;
-    }).toList();
+          return PlaylistItem(el);
+        }).toList();
+    currentItem = items.firstWhere((item) { return item.current?? false; });
+    return items;
   }
 
   List<PlaylistNode> get playlistNodes {

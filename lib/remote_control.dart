@@ -42,8 +42,8 @@ class _RemoteControlState extends State<RemoteControl> {
   Duration length = Duration.zero;
 
   Timer ticker;
-  int _tickInterval = 1; //secs
-  bool forceUpdate = false;
+  Timer delayedTimer;
+  static const _tickIntervalSecs = 1;
   bool showTimeLeft = false;
   bool sliding = false;
   bool skipNextStatus = false;
@@ -53,7 +53,7 @@ class _RemoteControlState extends State<RemoteControl> {
 
   @override
   initState() {
-    ticker = new Timer.periodic(Duration(seconds: _tickInterval), _tick);
+    ticker = new Timer.periodic(Duration(seconds: _tickIntervalSecs), _tick);
     super.initState();
     _checkWifi();
   }
@@ -156,7 +156,7 @@ class _RemoteControlState extends State<RemoteControl> {
       ticker.cancel();
       message = 'Paused polling for status updates';
     } else {
-      ticker = new Timer.periodic(Duration(seconds: _tickInterval), _tick);
+      ticker = new Timer.periodic(Duration(seconds: _tickIntervalSecs), _tick);
       message = 'Resumed polling for status updates';
     }
     Scaffold.of(context).showSnackBar(SnackBar(
@@ -198,7 +198,23 @@ class _RemoteControlState extends State<RemoteControl> {
     _updateStateAndPlaylist();
   }
 
+  _scheduleSingleUpdate() async {
+    delayedTimer = new Timer(new Duration(seconds: _tickIntervalSecs), _scheduledSingleUpdateCallback);
+  }
+
+  _scheduledSingleUpdateCallback() async {
+    if (delayedTimer != null) {
+      await _updateStateAndPlaylist();
+      delayedTimer.cancel();
+      delayedTimer = null;
+    }
+  }
+
   _updateStateAndPlaylist() async {
+    if (widget.settings.connection.isNotValid) {
+      return;
+    }
+
     var statusResponse = await _statusRequest();
     var playlistResponse = await _playlistRequest();
 
@@ -232,8 +248,6 @@ class _RemoteControlState extends State<RemoteControl> {
         return true;
       }());
     }
-
-    if (!ticker.isActive) forceUpdate = true;
   }
 
   _play(BrowseItem item) async {
@@ -242,7 +256,9 @@ class _RemoteControlState extends State<RemoteControl> {
       'id': item.id,
     });
 
-    if (!ticker.isActive) forceUpdate = true;
+    if (ticker != null && !ticker.isActive) {
+      _scheduleSingleUpdate();
+    }
     if (response == null) {
       return;
     }
@@ -253,7 +269,9 @@ class _RemoteControlState extends State<RemoteControl> {
       'command': 'pl_previous'
     });
 
-    if (!ticker.isActive) forceUpdate = true;
+    if (ticker != null && !ticker.isActive) {
+      _scheduleSingleUpdate();
+    }
     if (response == null) {
       return;
     }
@@ -264,7 +282,9 @@ class _RemoteControlState extends State<RemoteControl> {
       'command': 'pl_next'
     });
 
-    if (!ticker.isActive) forceUpdate = true;
+    if (ticker != null && !ticker.isActive) {
+      _scheduleSingleUpdate();
+    }
     if (response == null) {
       return;
     }
@@ -292,7 +312,9 @@ class _RemoteControlState extends State<RemoteControl> {
                   'id': item.id,
                 });
 
-                if (!ticker.isActive) forceUpdate = true;
+                if (ticker != null && !ticker.isActive) {
+                  _scheduleSingleUpdate();
+                }
                 if (response == null) {
                   return;
                 }
@@ -310,7 +332,9 @@ class _RemoteControlState extends State<RemoteControl> {
       'command': 'pl_empty'
     });
 
-    if (!ticker.isActive) forceUpdate = true;
+    if (ticker != null && !ticker.isActive) {
+      _scheduleSingleUpdate();
+    }
     if (response == null) {
       return;
     }
@@ -321,7 +345,9 @@ class _RemoteControlState extends State<RemoteControl> {
       'command': 'pl_random'
     });
 
-    if (!ticker.isActive) forceUpdate = true;
+    if (ticker != null && !ticker.isActive) {
+      _scheduleSingleUpdate();
+    }
     if (response == null) {
       return;
     }
@@ -332,7 +358,9 @@ class _RemoteControlState extends State<RemoteControl> {
       'command': 'pl_repeat'
     });
 
-    if (!ticker.isActive) forceUpdate = true;
+    if (ticker != null && !ticker.isActive) {
+      _scheduleSingleUpdate();
+    }
     if (response == null) {
       return;
     }
@@ -343,7 +371,9 @@ class _RemoteControlState extends State<RemoteControl> {
       'command': 'pl_loop'
     });
 
-    if (!ticker.isActive) forceUpdate = true;
+    if (ticker != null && !ticker.isActive) {
+      _scheduleSingleUpdate();
+    }
     if (response == null) {
       return;
     }
@@ -355,7 +385,9 @@ class _RemoteControlState extends State<RemoteControl> {
       'val': '$percent%',
     });
 
-    if (!ticker.isActive) forceUpdate = true;
+    if (ticker != null && !ticker.isActive) {
+      _scheduleSingleUpdate();
+    }
     if (response == null) {
       return;
     }
@@ -370,7 +402,9 @@ class _RemoteControlState extends State<RemoteControl> {
       'val': '''${seekTime > 0 ? '+' : ''}${seekTime}S''',
     });
 
-    if (!ticker.isActive) forceUpdate = true;
+    if (ticker != null && !ticker.isActive) {
+      _scheduleSingleUpdate();
+    }
     if (response == null) {
       return;
     }
@@ -383,13 +417,13 @@ class _RemoteControlState extends State<RemoteControl> {
     // Pre-empt the expected state so the button feels more responsive
     setState(() {
       state = (state == 'playing' ? 'paused' : 'playing');
-      forceUpdate = false;
     });
     _statusRequest({
       'command': 'pl_pause',
     });
-
-    if (!ticker.isActive) forceUpdate = true;
+    if (ticker != null && !ticker.isActive) {
+      _scheduleSingleUpdate();
+    }
   }
 
   _stop() {
@@ -402,8 +436,9 @@ class _RemoteControlState extends State<RemoteControl> {
     _statusRequest({
       'command': 'pl_stop',
     });
-
-    if (!ticker.isActive) forceUpdate = true;
+    if (ticker != null && !ticker.isActive) {
+      _scheduleSingleUpdate();
+    }
   }
 
   double _sliderValue() {
@@ -600,11 +635,6 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   Widget _body() {
-    if (forceUpdate) {
-      _updateStateAndPlaylist();
-      forceUpdate = false;
-    }
-    
     if (playlist == null || playlist.isEmpty) {
       return Expanded(
         child: Padding(
