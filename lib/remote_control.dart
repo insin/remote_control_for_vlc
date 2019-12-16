@@ -32,14 +32,18 @@ class RemoteControl extends StatefulWidget {
 
 class _RemoteControlState extends State<RemoteControl> {
   http.Client client = http.Client();
-  int lastStatusCode;
+  int lastStatusResponseCode;
+  int lastPlaylistResponseCode;
   VlcStatusResponse lastStatusResponse;
+  VlcPlaylistResponse lastPlaylistResponse;
   String state = 'stopped';
   String title = '';
   Duration time = Duration.zero;
   Duration length = Duration.zero;
 
   Timer ticker;
+  int _tickInterval = 1; //secs
+  bool forceUpdate = false;
   bool showTimeLeft = false;
   bool sliding = false;
   bool skipNextStatus = false;
@@ -49,7 +53,7 @@ class _RemoteControlState extends State<RemoteControl> {
 
   @override
   initState() {
-    ticker = new Timer.periodic(Duration(seconds: 1), _tick);
+    ticker = new Timer.periodic(Duration(seconds: _tickInterval), _tick);
     super.initState();
     _checkWifi();
   }
@@ -75,6 +79,15 @@ class _RemoteControlState extends State<RemoteControl> {
         print(statusResponse);
         return true;
       }());
+      setState(() {
+        state = statusResponse.state;
+        length = statusResponse.length;
+        title = statusResponse.title;
+        if (!sliding) {
+          time = statusResponse.time;
+        }
+        lastStatusResponse = statusResponse;
+      });
       return statusResponse;
     }
     return null;
@@ -92,6 +105,11 @@ class _RemoteControlState extends State<RemoteControl> {
         print(playlistResponse);
         return true;
       }());
+      setState(() {
+        playlist = playlistResponse.playListItems;
+        playing = playlistResponse.currentItem;
+        lastPlaylistResponse = lastPlaylistResponse;
+      });
       return playlistResponse;
     }
     return null;
@@ -120,7 +138,11 @@ class _RemoteControlState extends State<RemoteControl> {
       }());
     }
     setState(() {
-      lastStatusCode = response?.statusCode ?? -1;
+      if (requestType == 'status') {
+        lastStatusResponseCode = response?.statusCode ?? -1;
+      } else if (requestType == 'playlist') {
+        lastPlaylistResponseCode = response?.statusCode ?? -1;
+      }
     });
     if (response?.statusCode == 200) {
       return xml.parse(response.body);
@@ -134,7 +156,7 @@ class _RemoteControlState extends State<RemoteControl> {
       ticker.cancel();
       message = 'Paused polling for status updates';
     } else {
-      ticker = new Timer.periodic(Duration(seconds: 1), _tick);
+      ticker = new Timer.periodic(Duration(seconds: _tickInterval), _tick);
       message = 'Resumed polling for status updates';
     }
     Scaffold.of(context).showSnackBar(SnackBar(
@@ -173,28 +195,18 @@ class _RemoteControlState extends State<RemoteControl> {
       return;
     }
 
-    if (skipNextStatus) {
-      skipNextStatus = false;
+    _updateStateAndPlaylist();
+  }
+
+  _updateStateAndPlaylist() async {
+    var statusResponse = await _statusRequest();
+    var playlistResponse = await _playlistRequest();
+
+    if (statusResponse == null || playlistResponse == null) {
+      lastStatusResponse = statusResponse;
+      lastPlaylistResponse = playlistResponse;
       return;
     }
-
-    var response = await _statusRequest();
-
-    if (response == null) {
-      lastStatusResponse = response;
-      return;
-    }
-
-    // TODO Try to detect if the playing file was changed from VLC itself and switch back to default display
-    setState(() {
-      state = response.state;
-      length = response.length;
-      title = response.title;
-      if (!sliding) {
-        time = response.time;
-      }
-      lastStatusResponse = response;
-    });
   }
 
   _openMedia() async {
@@ -220,6 +232,8 @@ class _RemoteControlState extends State<RemoteControl> {
         return true;
       }());
     }
+
+    if (!ticker.isActive) forceUpdate = true;
   }
 
   _play(BrowseItem item) async {
@@ -227,6 +241,8 @@ class _RemoteControlState extends State<RemoteControl> {
       'command': 'pl_play',
       'id': item.id,
     });
+
+    if (!ticker.isActive) forceUpdate = true;
     if (response == null) {
       return;
     }
@@ -236,6 +252,8 @@ class _RemoteControlState extends State<RemoteControl> {
     var response = await _statusRequest({
       'command': 'pl_previous'
     });
+
+    if (!ticker.isActive) forceUpdate = true;
     if (response == null) {
       return;
     }
@@ -245,6 +263,8 @@ class _RemoteControlState extends State<RemoteControl> {
     var response = await _statusRequest({
       'command': 'pl_next'
     });
+
+    if (!ticker.isActive) forceUpdate = true;
     if (response == null) {
       return;
     }
@@ -271,6 +291,8 @@ class _RemoteControlState extends State<RemoteControl> {
                   'command': 'pl_delete',
                   'id': item.id,
                 });
+
+                if (!ticker.isActive) forceUpdate = true;
                 if (response == null) {
                   return;
                 }
@@ -287,6 +309,8 @@ class _RemoteControlState extends State<RemoteControl> {
     var response = await _statusRequest({
       'command': 'pl_empty'
     });
+
+    if (!ticker.isActive) forceUpdate = true;
     if (response == null) {
       return;
     }
@@ -296,6 +320,8 @@ class _RemoteControlState extends State<RemoteControl> {
     var response = await _statusRequest({
       'command': 'pl_random'
     });
+
+    if (!ticker.isActive) forceUpdate = true;
     if (response == null) {
       return;
     }
@@ -305,6 +331,8 @@ class _RemoteControlState extends State<RemoteControl> {
     var response = await _statusRequest({
       'command': 'pl_repeat'
     });
+
+    if (!ticker.isActive) forceUpdate = true;
     if (response == null) {
       return;
     }
@@ -314,6 +342,8 @@ class _RemoteControlState extends State<RemoteControl> {
     var response = await _statusRequest({
       'command': 'pl_loop'
     });
+
+    if (!ticker.isActive) forceUpdate = true;
     if (response == null) {
       return;
     }
@@ -324,6 +354,8 @@ class _RemoteControlState extends State<RemoteControl> {
       'command': 'seek',
       'val': '$percent%',
     });
+
+    if (!ticker.isActive) forceUpdate = true;
     if (response == null) {
       return;
     }
@@ -337,6 +369,8 @@ class _RemoteControlState extends State<RemoteControl> {
       'command': 'seek',
       'val': '''${seekTime > 0 ? '+' : ''}${seekTime}S''',
     });
+
+    if (!ticker.isActive) forceUpdate = true;
     if (response == null) {
       return;
     }
@@ -349,11 +383,13 @@ class _RemoteControlState extends State<RemoteControl> {
     // Pre-empt the expected state so the button feels more responsive
     setState(() {
       state = (state == 'playing' ? 'paused' : 'playing');
-      skipNextStatus = true;
+      forceUpdate = false;
     });
     _statusRequest({
       'command': 'pl_pause',
     });
+
+    if (!ticker.isActive) forceUpdate = true;
   }
 
   _stop() {
@@ -366,6 +402,8 @@ class _RemoteControlState extends State<RemoteControl> {
     _statusRequest({
       'command': 'pl_stop',
     });
+
+    if (!ticker.isActive) forceUpdate = true;
   }
 
   double _sliderValue() {
@@ -469,6 +507,13 @@ class _RemoteControlState extends State<RemoteControl> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      Visibility(
+                        visible: ticker != null ? !ticker.isActive : true,
+                        child: IconButton(
+                          icon: Icon(Icons.refresh),
+                          onPressed: _updateStateAndPlaylist,
+                        ),
+                      ),
                       IconButton(
                         icon: Icon(Icons.settings),
                         onPressed: () {
@@ -488,7 +533,7 @@ class _RemoteControlState extends State<RemoteControl> {
                         },
                       ),
                       Visibility(
-                        visible: lastStatusCode == 200,
+                        visible: lastStatusResponseCode == 200,
                         child: PopupMenuButton<PopupMenuChoice>(
                           onSelected: _onPopupMenuChoice,
                           itemBuilder: (context) {
@@ -555,12 +600,16 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   Widget _body() {
-    _getPlaylist();
+    if (forceUpdate) {
+      _updateStateAndPlaylist();
+      forceUpdate = false;
+    }
+    
     if (playlist == null || playlist.isEmpty) {
       return Expanded(
         child: Padding(
           padding: EdgeInsets.all(32),
-          child: lastStatusCode == 200
+          child: lastPlaylistResponseCode == 200
               ? Image.asset('assets/icon-512.png')
               : ConnectionAnimation(),
         ),
