@@ -470,7 +470,8 @@ class VlcPlaylistResponse {
         .map((el) {
           return PlaylistItem(el);
         }).toList();
-    currentItem = items.firstWhere((item) { return item.current?? false; });
+    currentItem = items.isEmpty ? null :
+                  items.firstWhere((item) { return item.current?? false; });
     return items;
   }
 

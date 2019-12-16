@@ -132,6 +132,7 @@ class _RemoteControlState extends State<RemoteControl> {
         },
       ).timeout(Duration(seconds: 1));
     } catch (e) {
+      _resetPlaylist();
       assert(() {
         print('Error: ${e.runtimeType}');
         return true;
@@ -191,10 +192,6 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _tick(timer) async {
-    if (widget.settings.connection.isNotValid) {
-      return;
-    }
-
     _updateStateAndPlaylist();
   }
 
@@ -210,7 +207,18 @@ class _RemoteControlState extends State<RemoteControl> {
     }
   }
 
+  _resetPlaylist() {
+    playing = null;
+    playlist = null;
+    title = '';
+  }
+
   _updateStateAndPlaylist() async {
+    if (widget.settings.connection.isNotValid) {
+      _resetPlaylist();
+      return;
+    }
+
     var statusResponse = await _statusRequest();
     var playlistResponse = await _playlistRequest();
 
