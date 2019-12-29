@@ -51,6 +51,7 @@ class _RemoteControlState extends State<RemoteControl> {
 
   List<PlaylistItem> playlist;
   PlaylistItem playing;
+  String currentPlId;
 
   @override
   initState() {
@@ -87,6 +88,7 @@ class _RemoteControlState extends State<RemoteControl> {
           volume = statusResponse.volume;
         }
         title = statusResponse.title;
+        currentPlId = statusResponse.currentPlId;
         if (!sliding) {
           time = statusResponse.time;
         }
@@ -200,15 +202,15 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _scheduleSingleUpdate() async {
-    delayedTimer = new Timer(new Duration(seconds: _tickIntervalSecs), _scheduledSingleUpdateCallback);
-  }
-
-  _scheduledSingleUpdateCallback() async {
-    if (delayedTimer != null) {
-      await _updateStateAndPlaylist();
-      delayedTimer.cancel();
-      delayedTimer = null;
+    if (ticker != null && ticker.isActive) {
+      return; // ticker will do the UI updates, no need to schedule any further update
     }
+
+    if (delayedTimer != null && delayedTimer.isActive) {
+      delayedTimer.cancel(); // cancel any existing delay timer so the latest state is updated in one shot
+    }
+
+    delayedTimer = new Timer(new Duration(seconds: _tickIntervalSecs), _updateStateAndPlaylist);
   }
 
   _resetPlaylist() {
@@ -264,9 +266,7 @@ class _RemoteControlState extends State<RemoteControl> {
       'id': item.id,
     });
 
-    if (ticker != null && !ticker.isActive) {
-      _scheduleSingleUpdate();
-    }
+    _scheduleSingleUpdate();
     if (response == null) {
       return;
     }
@@ -277,9 +277,7 @@ class _RemoteControlState extends State<RemoteControl> {
       'command': 'pl_previous'
     });
 
-    if (ticker != null && !ticker.isActive) {
-      _scheduleSingleUpdate();
-    }
+    _scheduleSingleUpdate();
     if (response == null) {
       return;
     }
@@ -290,9 +288,7 @@ class _RemoteControlState extends State<RemoteControl> {
       'command': 'pl_next'
     });
 
-    if (ticker != null && !ticker.isActive) {
-      _scheduleSingleUpdate();
-    }
+    _scheduleSingleUpdate();
     if (response == null) {
       return;
     }
@@ -320,9 +316,7 @@ class _RemoteControlState extends State<RemoteControl> {
                   'id': item.id,
                 });
 
-                if (ticker != null && !ticker.isActive) {
-                  _scheduleSingleUpdate();
-                }
+                _scheduleSingleUpdate();
                 if (response == null) {
                   return;
                 }
@@ -340,9 +334,7 @@ class _RemoteControlState extends State<RemoteControl> {
       'command': 'pl_empty'
     });
 
-    if (ticker != null && !ticker.isActive) {
-      _scheduleSingleUpdate();
-    }
+    _scheduleSingleUpdate();
     if (response == null) {
       return;
     }
@@ -353,9 +345,7 @@ class _RemoteControlState extends State<RemoteControl> {
       'command': 'pl_random'
     });
 
-    if (ticker != null && !ticker.isActive) {
-      _scheduleSingleUpdate();
-    }
+    _scheduleSingleUpdate();
     if (response == null) {
       return;
     }
@@ -366,9 +356,7 @@ class _RemoteControlState extends State<RemoteControl> {
       'command': 'pl_repeat'
     });
 
-    if (ticker != null && !ticker.isActive) {
-      _scheduleSingleUpdate();
-    }
+    _scheduleSingleUpdate();
     if (response == null) {
       return;
     }
@@ -379,9 +367,7 @@ class _RemoteControlState extends State<RemoteControl> {
       'command': 'pl_loop'
     });
 
-    if (ticker != null && !ticker.isActive) {
-      _scheduleSingleUpdate();
-    }
+    _scheduleSingleUpdate();
     if (response == null) {
       return;
     }
@@ -393,9 +379,7 @@ class _RemoteControlState extends State<RemoteControl> {
       'val': '$percent%',
     });
 
-    if (ticker != null && !ticker.isActive) {
-      _scheduleSingleUpdate();
-    }
+    _scheduleSingleUpdate();
     if (response == null) {
       return;
     }
@@ -410,9 +394,7 @@ class _RemoteControlState extends State<RemoteControl> {
       'val': '''${seekTime > 0 ? '+' : ''}${seekTime}S''',
     });
 
-    if (ticker != null && !ticker.isActive) {
-      _scheduleSingleUpdate();
-    }
+    _scheduleSingleUpdate();
     if (response == null) {
       return;
     }
@@ -428,9 +410,7 @@ class _RemoteControlState extends State<RemoteControl> {
       'val': '$scaledVolume',
     });
 
-    if (ticker != null && !ticker.isActive) {
-      _scheduleSingleUpdate();
-    }
+    _scheduleSingleUpdate();
     if (response == null) {
       return;
     }
@@ -449,9 +429,7 @@ class _RemoteControlState extends State<RemoteControl> {
       'val': '${relativeValue > 0 ? '+' : ''}$relativeValue',
     });
 
-    if (ticker != null && !ticker.isActive) {
-      _scheduleSingleUpdate();
-    }
+    _scheduleSingleUpdate();
     if (response == null) {
       return;
     }
@@ -468,9 +446,7 @@ class _RemoteControlState extends State<RemoteControl> {
     _statusRequest({
       'command': 'pl_pause',
     });
-    if (ticker != null && !ticker.isActive) {
-      _scheduleSingleUpdate();
-    }
+    _scheduleSingleUpdate();
   }
 
   _stop() {
@@ -483,9 +459,7 @@ class _RemoteControlState extends State<RemoteControl> {
     _statusRequest({
       'command': 'pl_stop',
     });
-    if (ticker != null && !ticker.isActive) {
-      _scheduleSingleUpdate();
-    }
+    _scheduleSingleUpdate();
   }
 
   double _volumeSliderValue() {
@@ -876,7 +850,7 @@ class _RemoteControlState extends State<RemoteControl> {
                     size: 30,
                   ),
                   onTap: () {
-                    _seekRelative(-10);
+                    _seekRelative(-5);
                   },
                 ),
                 Padding(
@@ -896,7 +870,7 @@ class _RemoteControlState extends State<RemoteControl> {
                     size: 30,
                   ),
                   onTap: () {
-                    _seekRelative(10);
+                    _seekRelative(5);
                   },
                 ),
                 Expanded(child: VerticalDivider()),
