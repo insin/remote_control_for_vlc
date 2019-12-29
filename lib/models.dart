@@ -316,6 +316,8 @@ class VlcStatusResponse {
   Duration get length => Duration(
       seconds: int.tryParse(document.findAllElements('length').first.text));
 
+  int get volume => int.tryParse(document.findAllElements('volume').first.text);
+
   String get title {
     Map<String, String> titles = Map.fromIterable(
       document.findAllElements('info').where(
@@ -380,6 +382,7 @@ class VlcStatusResponse {
       'state': state,
       'time': time,
       'length': length,
+      'volume': volume,
       'title': title,
       'fullscreen': fullscreen,
       'repeat': repeat,

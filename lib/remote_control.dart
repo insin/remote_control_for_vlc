@@ -40,13 +40,14 @@ class _RemoteControlState extends State<RemoteControl> {
   String title = '';
   Duration time = Duration.zero;
   Duration length = Duration.zero;
+  int volume = 0;
 
   Timer ticker;
   Timer delayedTimer;
   static const _tickIntervalSecs = 1;
   bool showTimeLeft = false;
   bool sliding = false;
-  bool skipNextStatus = false;
+  bool volumeSliding = false;
 
   List<PlaylistItem> playlist;
   PlaylistItem playing;
@@ -82,6 +83,9 @@ class _RemoteControlState extends State<RemoteControl> {
       setState(() {
         state = statusResponse.state;
         length = statusResponse.length;
+        if (!volumeSliding) {
+          volume = statusResponse.volume;
+        }
         title = statusResponse.title;
         if (!sliding) {
           time = statusResponse.time;
@@ -416,6 +420,45 @@ class _RemoteControlState extends State<RemoteControl> {
       time = response.time;
     });
   }
+  
+  _volumePercent(int percent) async {
+    var scaledVolume = percent * VolumeSliderScaleFactor;
+    var response = await _statusRequest({
+      'command': 'volume',
+      'val': '$scaledVolume',
+    });
+
+    if (ticker != null && !ticker.isActive) {
+      _scheduleSingleUpdate();
+    }
+    if (response == null) {
+      return;
+    }
+    setState(() {
+      volume = response.volume;
+    });
+  }
+  
+  _volumeRelative(int relativeValue) async {
+    if ((volume <= 0 && relativeValue < 0) ||
+        (volume >= 512 && relativeValue > 0))
+      return; // Nothing to do if already min or max
+
+    var response = await _statusRequest({
+      'command': 'volume',
+      'val': '${relativeValue > 0 ? '+' : ''}$relativeValue',
+    });
+
+    if (ticker != null && !ticker.isActive) {
+      _scheduleSingleUpdate();
+    }
+    if (response == null) {
+      return;
+    }
+    setState(() {
+      volume = response.volume;
+    });
+  }
 
   _pause() async {
     // Pre-empt the expected state so the button feels more responsive
@@ -443,6 +486,10 @@ class _RemoteControlState extends State<RemoteControl> {
     if (ticker != null && !ticker.isActive) {
       _scheduleSingleUpdate();
     }
+  }
+
+  double _volumeSliderValue() {
+    return volume / VolumeSliderScaleFactor;
   }
 
   double _sliderValue() {
@@ -691,6 +738,56 @@ class _RemoteControlState extends State<RemoteControl> {
       color: headerFooterBgColor,
       child: Column(
         children: <Widget>[
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 10),
+            child: Row(
+              children: <Widget>[
+                Builder(
+                  builder: (context) => GestureDetector(
+                    onTap: () {
+                      _volumeRelative(-5);
+                    },
+                    onDoubleTap: () {
+                      if (volume > 0) {
+                        _volumePercent(0);
+                      } else {
+                        _volumePercent(100);
+                      }
+                    },
+                    child: Icon(Icons.volume_down)
+                  ),
+                ),
+                Flexible(
+                    flex: 1,
+                    child: Slider(
+                      max: 200,
+                      value: _volumeSliderValue(),
+                      onChangeStart: (percent) async {
+                        setState(() {
+                          volumeSliding = true;
+                        });
+                      },
+                      onChanged: (percent) async {
+                        await _volumePercent(percent.round());
+                      },
+                      onChangeEnd: (percent) async {
+                        await _volumePercent(percent.round());
+                        setState(() {
+                          volumeSliding = false;
+                        });
+                      },
+                    )),
+                Builder(
+                  builder: (context) => GestureDetector(
+                      onTap: () {
+                        _volumeRelative(5);
+                      },
+                      child: Icon(Icons.volume_up)
+                  ),
+                ),
+              ],
+            ),
+          ),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 14),
             child: Row(
