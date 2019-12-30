@@ -740,7 +740,7 @@ class _RemoteControlState extends State<RemoteControl> {
 
   Widget _footer() {
     return Visibility(
-      visible: widget.settings.connection.isValid,
+      visible: widget.settings.connection.isValid && lastStatusResponseCode == 200,
       child: Container(
         color: headerFooterBgColor,
         child: Column(
