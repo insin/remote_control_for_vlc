@@ -739,191 +739,201 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   Widget _footer() {
-    return Container(
-      color: headerFooterBgColor,
-      child: Column(
-        children: <Widget>[
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 10),
-            child: Row(
-              children: <Widget>[
-                Builder(
-                  builder: (context) => GestureDetector(
-                    onTap: () {
-                      _volumeRelative(-5);
-                    },
-                    onDoubleTap: () {
-                      if (volume > 0) {
-                        _volumePercent(0);
-                      } else {
-                        _volumePercent(100);
-                      }
-                    },
-                    child: Icon(Icons.volume_down)
-                  ),
-                ),
-                Flexible(
-                    flex: 1,
-                    child: Slider(
-                      max: 200,
-                      value: _volumeSliderValue(),
-                      onChangeStart: (percent) async {
-                        setState(() {
-                          volumeSliding = true;
-                        });
-                      },
-                      onChanged: (percent) async {
-                        await _volumePercent(percent.round());
-                      },
-                      onChangeEnd: (percent) async {
-                        await _volumePercent(percent.round());
-                        setState(() {
-                          volumeSliding = false;
-                        });
-                      },
-                    )),
-                Builder(
-                  builder: (context) => GestureDetector(
+    return Visibility(
+      visible: widget.settings.connection.isValid,
+      child: Container(
+        color: headerFooterBgColor,
+        child: Column(
+          children: <Widget>[
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 14),
+              child: Row(
+                children: <Widget>[
+                  Builder(
+                    builder: (context) => GestureDetector(
                       onTap: () {
-                        _volumeRelative(5);
+                        _volumeRelative(-5);
                       },
-                      child: Icon(Icons.volume_up)
+                      onDoubleTap: () {
+                        if (volume > 0) {
+                          _volumePercent(0);
+                        } else {
+                          _volumePercent(100);
+                        }
+                      },
+                      child: Icon(Icons.volume_down)
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 14),
-            child: Row(
-              children: <Widget>[
-                Builder(
-                  builder: (context) => GestureDetector(
-                        onTap: () {
-                          _togglePolling(context);
+                  Flexible(
+                      flex: 1,
+                      child: Slider(
+                        max: 200,
+                        value: _volumeSliderValue(),
+                        onChangeStart: (percent) async {
+                          setState(() {
+                            volumeSliding = true;
+                          });
                         },
-                        child: Text(
-                          state != 'stopped' ? formatTime(time) : '––:––',
-                          style: TextStyle(
-                            color: ticker.isActive
-                                ? Theme.of(context).textTheme.body1.color
-                                : Theme.of(context).disabledColor,
+                        onChanged: (percent) async {
+                          await _volumePercent(percent.round());
+                        },
+                        onChangeEnd: (percent) async {
+                          await _volumePercent(percent.round());
+                          setState(() {
+                            volumeSliding = false;
+                          });
+                        },
+                      )),
+                  Builder(
+                    builder: (context) => GestureDetector(
+                        onTap: () {
+                          _volumeRelative(5);
+                        },
+                        onDoubleTap: () {
+                          if (volume > 0) {
+                            _volumePercent(0);
+                          } else {
+                            _volumePercent(100);
+                          }
+                        },
+                        child: Icon(Icons.volume_up)
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 14),
+              child: Row(
+                children: <Widget>[
+                  Builder(
+                    builder: (context) => GestureDetector(
+                          onTap: () {
+                            _togglePolling(context);
+                          },
+                          child: Text(
+                            state != 'stopped' ? formatTime(time) : '––:––',
+                            style: TextStyle(
+                              color: ticker.isActive
+                                  ? Theme.of(context).textTheme.body1.color
+                                  : Theme.of(context).disabledColor,
+                            ),
                           ),
                         ),
-                      ),
-                ),
-                Flexible(
-                    flex: 1,
-                    child: Slider(
-                      divisions: 100,
-                      max: state != 'stopped' ? 100 : 0,
-                      value: _sliderValue(),
-                      onChangeStart: (percent) {
-                        setState(() {
-                          sliding = true;
-                        });
-                      },
-                      onChanged: (percent) {
-                        setState(() {
-                          time = Duration(
-                            seconds: (length.inSeconds / 100 * percent).round(),
-                          );
-                        });
-                      },
-                      onChangeEnd: (percent) async {
-                        await _seekPercent(percent.round());
-                        setState(() {
-                          sliding = false;
-                        });
-                      },
-                    )),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      showTimeLeft = !showTimeLeft;
-                    });
-                  },
-                  child: Text(
-                    state != 'stopped'
-                        ? showTimeLeft
-                            ? '-' + formatTime(length - time)
-                            : formatTime(length)
-                        : '––:––',
                   ),
-                ),
-              ],
+                  Flexible(
+                      flex: 1,
+                      child: Slider(
+                        divisions: 100,
+                        max: state != 'stopped' ? 100 : 0,
+                        value: _sliderValue(),
+                        onChangeStart: (percent) {
+                          setState(() {
+                            sliding = true;
+                          });
+                        },
+                        onChanged: (percent) {
+                          setState(() {
+                            time = Duration(
+                              seconds: (length.inSeconds / 100 * percent).round(),
+                            );
+                          });
+                        },
+                        onChangeEnd: (percent) async {
+                          await _seekPercent(percent.round());
+                          setState(() {
+                            sliding = false;
+                          });
+                        },
+                      )),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        showTimeLeft = !showTimeLeft;
+                      });
+                    },
+                    child: Text(
+                      state != 'stopped'
+                          ? showTimeLeft
+                              ? '-' + formatTime(length - time)
+                              : formatTime(length)
+                          : '––:––',
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Padding(
-            padding: EdgeInsets.only(left: 9, right: 9, bottom: 6, top: 3),
-            child: Row(
-              // mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: <Widget>[
-                GestureDetector(
-                  child: Icon(
-                    Icons.stop,
-                    size: 30,
+            Padding(
+              padding: EdgeInsets.only(left: 9, right: 9, bottom: 6, top: 3),
+              child: Row(
+                // mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: <Widget>[
+                  GestureDetector(
+                    child: Icon(
+                      Icons.stop,
+                      size: 30,
+                    ),
+                    onTap: _stop,
                   ),
-                  onTap: _stop,
-                ),
-                Expanded(child: VerticalDivider()),
-                GestureDetector(
-                  child: Icon(
-                    Icons.skip_previous,
-                    size: 30,
+                  Expanded(child: VerticalDivider()),
+                  GestureDetector(
+                    child: Icon(
+                      Icons.skip_previous,
+                      size: 30,
+                    ),
+                    onTap: _previous,
                   ),
-                  onTap: _previous,
-                ),
-                Expanded(child: VerticalDivider()),
-                GestureDetector(
-                  child: Icon(
-                    Icons.fast_rewind,
-                    size: 30,
+                  Expanded(child: VerticalDivider()),
+                  GestureDetector(
+                    child: Icon(
+                      Icons.fast_rewind,
+                      size: 30,
+                    ),
+                    onTap: () {
+                      _seekRelative(-5);
+                    },
                   ),
-                  onTap: () {
-                    _seekRelative(-5);
-                  },
-                ),
-                Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 10),
-                    child: GestureDetector(
-                      onTap: _pause,
-                      child: Icon(
-                        state == 'paused' || state == 'stopped'
-                            ? Icons.play_arrow
-                            : Icons.pause,
-                        size: 42,
-                      ),
-                    )),
-                GestureDetector(
-                  child: Icon(
-                    Icons.fast_forward,
-                    size: 30,
+                  Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 10),
+                      child: GestureDetector(
+                        onTap: _pause,
+                        child: Icon(
+                          state == 'paused' || state == 'stopped'
+                              ? Icons.play_arrow
+                              : Icons.pause,
+                          size: 42,
+                        ),
+                      )),
+                  GestureDetector(
+                    child: Icon(
+                      Icons.fast_forward,
+                      size: 30,
+                    ),
+                    onTap: () {
+                      _seekRelative(5);
+                    },
                   ),
-                  onTap: () {
-                    _seekRelative(5);
-                  },
-                ),
-                Expanded(child: VerticalDivider()),
-                GestureDetector(
-                  child: Icon(
-                    Icons.skip_next,
-                    size: 30,
+                  Expanded(child: VerticalDivider()),
+                  GestureDetector(
+                    child: Icon(
+                      Icons.skip_next,
+                      size: 30,
+                    ),
+                    onTap: _next,
                   ),
-                  onTap: _next,
-                ),
-                Expanded(child: VerticalDivider()),
-                GestureDetector(
-                  child: Icon(
-                    Icons.eject,
-                    size: 30,
+                  Expanded(child: VerticalDivider()),
+                  GestureDetector(
+                    child: Icon(
+                      Icons.eject,
+                      size: 30,
+                    ),
+                    onTap: _openMedia,
                   ),
-                  onTap: _openMedia,
-                ),
-              ],
-            ),
-          )
-        ],
+                ],
+              ),
+            )
+          ],
+        ),
       ),
     );
   }
