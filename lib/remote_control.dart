@@ -260,7 +260,38 @@ class _RemoteControlState extends State<RemoteControl> {
     }
   }
 
-  _play(BrowseItem item) async {
+  _enqueueMedia() async {
+    BrowseResult result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (context) => OpenMedia(
+            prefs: widget.prefs,
+            settings: widget.settings,
+          )),
+    );
+
+    if (result != null) {
+      var response = await _statusRequest({
+        'command': 'in_enqueue',
+        'input': result.item.uri,
+      });
+      _scheduleSingleUpdate();
+      if (response == null) {
+        return;
+      }
+      assert(() {
+        print('Enqueued ${result.item}');
+        return true;
+      }());
+    }
+  }
+
+  _play(PlaylistItem item) async {
+    // Preempt setting active playlist item
+    if (playing != item) {
+      playing = item;
+    }
+
     var response = await _statusRequest({
       'command': 'pl_play',
       'id': item.id,
