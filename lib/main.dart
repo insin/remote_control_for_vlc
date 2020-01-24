@@ -5,6 +5,7 @@ import 'models.dart';
 import 'remote_control.dart';
 
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   var prefs = await SharedPreferences.getInstance();
   runApp(VlcRemote(prefs: prefs, settings: Settings(prefs)));
 }
