@@ -514,7 +514,7 @@ class _RemoteControlState extends State<RemoteControl> {
                     onPressed: () {
                       Navigator.pop(context, option);
                     },
-                    child: Text(option.language),
+                    child: Text(option.name),
                   ))
               .toList(),
         );

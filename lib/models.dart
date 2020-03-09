@@ -291,13 +291,13 @@ class Settings {
 }
 
 class LanguageTrack {
-  String language;
+  String name;
   int streamNumber;
 
-  LanguageTrack(this.language, this.streamNumber);
+  LanguageTrack(this.name, this.streamNumber);
 
   String toString() {
-    return '$language ($streamNumber)';
+    return '$name ($streamNumber)';
   }
 }
 
@@ -366,11 +366,21 @@ class VlcStatusResponse {
       Map<String, String> info = Map.fromIterable(category.findElements('info'),
           key: (info) => info.getAttribute('name'), value: (info) => info.text);
       if (info['Type'] == type) {
-        var lang = info['Language'];
-        if (lang != null && lang.isNotEmpty) {
-          tracks.add(new LanguageTrack(lang,
-              int.parse(category.getAttribute('name').split(' ').last)));
+        var language = info['Language'];
+        if (language == null || language.isEmpty) {
+          return;
         }
+        var description = info['Description'];
+        var name = language;
+        if (description != null && description.isNotEmpty) {
+          if (description.startsWith(language)) {
+            name = description;
+          } else {
+            name = '$description [$language]';
+          }
+        }
+        tracks.add(new LanguageTrack(
+            name, int.parse(category.getAttribute('name').split(' ').last)));
       }
     });
     tracks.sort((a, b) => a.streamNumber - b.streamNumber);
