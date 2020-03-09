@@ -56,16 +56,12 @@ If VLC Remote was able to successfully connect, the connection info will be save
 
 ![](screenshots/settings.png)
 
-### Status and control of media already running on VLC
-
-![](screenshots/playing-vlc.png)
-
 ### Browsing for and playing media
 
-When you browse for and select media, the contents of the directory it was in are displayed as a playlist.
+When you browse for and select media, it will be enqueued on VLC's playlist.
 
 ![](screenshots/open-media.png)
 
 ![](screenshots/file-browser.png)
 
-![](screenshots/playing-open-media.png)
+![](screenshots/playing-vlc.png)
