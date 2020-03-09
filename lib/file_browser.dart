@@ -62,8 +62,8 @@ class _FileBrowserState extends State<FileBrowser> {
       return;
     }
 
-    List<BrowseItem> items = [];
-    var dirIndex = 0;
+    List<BrowseItem> dirs = [];
+    List<BrowseItem> files = [];
 
     if (response.statusCode == 200) {
       var document = xml.parse(response.body);
@@ -80,16 +80,22 @@ class _FileBrowserState extends State<FileBrowser> {
         }
 
         if (item.isDir) {
-          // Float directories to the top
-          items.insert(dirIndex++, item);
+          dirs.add(item);
         } else if (item.isSupportedMedia) {
-          items.add(item);
+          files.add(item);
         }
       });
     }
 
+    dirs.sort((a, b) {
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+    files.sort((a, b) {
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+
     setState(() {
-      _items = items;
+      _items = dirs + files;
       _loading = false;
     });
   }
@@ -100,21 +106,18 @@ class _FileBrowserState extends State<FileBrowser> {
         context,
         MaterialPageRoute(
           builder: (context) => FileBrowser(
-                dir: item,
-                isFave: widget.isFave,
-                onToggleFave: widget.onToggleFave,
-                settings: widget.settings,
-              ),
+            dir: item,
+            isFave: widget.isFave,
+            onToggleFave: widget.onToggleFave,
+            settings: widget.settings,
+          ),
         ),
       );
       if (result != null) {
         Navigator.pop(context, result);
       }
     } else {
-      Navigator.pop(
-        context,
-        BrowseResult(item)
-      );
+      Navigator.pop(context, BrowseResult(item));
     }
   }
 
