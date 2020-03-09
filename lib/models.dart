@@ -185,9 +185,7 @@ class BrowseItem {
 
 class BrowseResult {
   BrowseItem item;
-  List<BrowseItem> playlist;
-
-  BrowseResult(this.item, this.playlist);
+  BrowseResult(this.item);
 }
 
 // ignore: unused_element
@@ -318,6 +316,8 @@ class VlcStatusResponse {
   Duration get length => Duration(
       seconds: int.tryParse(document.findAllElements('length').first.text));
 
+  int get volume => int.tryParse(document.findAllElements('volume').first.text);
+
   String get title {
     Map<String, String> titles = Map.fromIterable(
       document.findAllElements('info').where(
@@ -330,6 +330,21 @@ class VlcStatusResponse {
 
   bool get fullscreen =>
       document.findAllElements('fullscreen').first.text == 'true';
+
+  bool get repeat =>
+      document.findAllElements('repeat').first.text == 'true';
+
+  bool get random =>
+      document.findAllElements('random').first.text == 'true';
+
+  bool get loop =>
+      document.findAllElements('loop').first.text == 'true';
+
+  String get currentPlId =>
+      document.findAllElements('currentplid').first.text;
+
+  String get version =>
+      document.findAllElements('version').first.text;
 
   List<LanguageTrack> get audioTracks {
     if (_audioTracks == null) {
@@ -351,8 +366,11 @@ class VlcStatusResponse {
       Map<String, String> info = Map.fromIterable(category.findElements('info'),
           key: (info) => info.getAttribute('name'), value: (info) => info.text);
       if (info['Type'] == type) {
-        tracks.add(new LanguageTrack(info['Language'],
-            int.parse(category.getAttribute('name').split(' ').last)));
+        var lang = info['Language'];
+        if (lang != null && lang.isNotEmpty) {
+          tracks.add(new LanguageTrack(lang,
+              int.parse(category.getAttribute('name').split(' ').last)));
+        }
       }
     });
     tracks.sort((a, b) => a.streamNumber - b.streamNumber);
@@ -360,14 +378,118 @@ class VlcStatusResponse {
   }
 
   String toString() {
-    return 'VlcResponse(${{
+    return 'VlcStatusResponse(${{
       'state': state,
       'time': time,
       'length': length,
+      'volume': volume,
       'title': title,
       'fullscreen': fullscreen,
+      'repeat': repeat,
+      'random': random,
+      'loop': loop,
+      'currentPlId': currentPlId,
+      'version': version,
       'audioTracks': audioTracks,
       'subtitleTracks': subtitleTracks,
+    }})';
+  }
+}
+
+class PlaylistItem {
+  xml.XmlElement leafElement;
+  PlaylistItem(this.leafElement);
+
+  String get name {
+    return leafElement.getAttribute('name');
+  }
+
+  String get id {
+    return leafElement.getAttribute('id');
+  }
+
+  Duration get duration {
+    return Duration(seconds: int.tryParse(leafElement.getAttribute('duration')));
+  }
+
+  String get uri {
+    return leafElement.getAttribute('uri');
+  }
+
+  bool get current {
+    var attribute = leafElement.getAttribute('current');
+    return attribute == null ? false : attribute.isNotEmpty;
+  }
+
+  String get title => cleanTitle(name, keepExt: false);
+
+  String toString() {
+    return 'PlaylistItem(${{
+      'name': name,
+      'title':  title,
+      'id': id,
+      'duration': duration,
+      'uri': uri,
+      'current': current
+    }})';
+  }
+}
+
+class PlaylistNode {
+  xml.XmlElement nodeElement;
+  PlaylistNode(this.nodeElement);
+
+  String get name {
+    return nodeElement.getAttribute('name');
+  }
+
+  String get id {
+    return nodeElement.getAttribute('id');
+  }
+
+  List<PlaylistItem> get playlistItems {
+    return nodeElement.findElements('leaf').map((el) {
+      return PlaylistItem(el);
+    }).toList();
+  }
+
+  String toString() {
+    return 'PlaylistNode(${{
+      'name': name,
+      'id': id,
+      'playlistItems': playlistItems
+    }})';
+  }
+}
+
+class VlcPlaylistResponse {
+  xml.XmlDocument document;
+  VlcPlaylistResponse(this.document);
+
+  PlaylistItem currentItem;
+  
+  List<PlaylistItem> get playListItems {
+    var items = document.rootElement.findAllElements('leaf')
+        .map((el) {
+          return PlaylistItem(el);
+        }).toList();
+    currentItem = items.isEmpty ? null :
+                  items.firstWhere((item) { return item.current?? false; });
+    return items;
+  }
+
+  List<PlaylistNode> get playlistNodes {
+    return document.rootElement.findElements('node')
+        .map((el) {
+          return PlaylistNode(el);
+        }).toList();
+  }
+
+  String toString() {
+    return 'VlcPlaylistResponse(${{
+      'playlistNodes': playlistNodes,
+      'playListItems': playListItems,
+      'currentItem': currentItem
     }})';
   }
 }

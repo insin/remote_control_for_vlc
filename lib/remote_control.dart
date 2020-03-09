@@ -14,7 +14,8 @@ import 'utils.dart';
 
 var headerFooterBgColor = Colors.grey.shade200.withOpacity(0.75);
 
-enum PopupMenuChoice { AUDIO_TRACK, FULLSCREEN, SUBTITLE_TRACK }
+enum PopupMenuChoice { AUDIO_TRACK, FULLSCREEN, SUBTITLE_TRACK,
+  RANDOM_PLAY, REPEAT, LOOP, EMPTY_PLAYLIST }
 
 class RemoteControl extends StatefulWidget {
   final SharedPreferences prefs;
@@ -31,24 +32,30 @@ class RemoteControl extends StatefulWidget {
 
 class _RemoteControlState extends State<RemoteControl> {
   http.Client client = http.Client();
-  int lastStatusCode;
+  int lastStatusResponseCode;
+  int lastPlaylistResponseCode;
   VlcStatusResponse lastStatusResponse;
+  VlcPlaylistResponse lastPlaylistResponse;
   String state = 'stopped';
   String title = '';
   Duration time = Duration.zero;
   Duration length = Duration.zero;
+  int volume = 0;
 
   Timer ticker;
+  Timer delayedTimer;
+  static const _tickIntervalSecs = 1;
   bool showTimeLeft = false;
   bool sliding = false;
-  bool skipNextStatus = false;
+  bool volumeSliding = false;
 
-  BrowseItem playing;
-  List<BrowseItem> playlist;
+  List<PlaylistItem> playlist;
+  PlaylistItem playing;
+  String currentPlId;
 
   @override
   initState() {
-    ticker = new Timer.periodic(Duration(seconds: 1), _tick);
+    ticker = new Timer.periodic(Duration(seconds: _tickIntervalSecs), _tick);
     super.initState();
     _checkWifi();
   }
@@ -63,16 +70,65 @@ class _RemoteControlState extends State<RemoteControl> {
 
   Future<VlcStatusResponse> _statusRequest(
       [Map<String, String> queryParameters]) async {
-    http.Response response;
-    try {
+    assert(() {
+      print('VlcStatusRequest(${queryParameters ?? {}})');
+      return true;
+    }());
+    xml.XmlDocument document = await _serverRequest('status', queryParameters);
+    if (document != null) {
+      var statusResponse = VlcStatusResponse(document);
       assert(() {
-        print('VlcStatusRequest(${queryParameters ?? {}})');
+        print(statusResponse);
         return true;
       }());
+      setState(() {
+        state = statusResponse.state;
+        length = statusResponse.length;
+        if (!volumeSliding) {
+          volume = statusResponse.volume;
+        }
+        title = statusResponse.title;
+        currentPlId = statusResponse.currentPlId;
+        if (!sliding) {
+          time = statusResponse.time;
+        }
+        lastStatusResponse = statusResponse;
+      });
+      return statusResponse;
+    }
+    return null;
+  }
+
+  Future<VlcPlaylistResponse> _playlistRequest() async {
+    assert(() {
+      print('VlcPlaylistRequest()');
+      return true;
+    }());
+    xml.XmlDocument document = await _serverRequest('playlist', null);
+    if (document != null) {
+      var playlistResponse = VlcPlaylistResponse(document);
+      assert(() {
+        print(playlistResponse);
+        return true;
+      }());
+      setState(() {
+        playlist = playlistResponse.playListItems;
+        playing = playlistResponse.currentItem;
+        lastPlaylistResponse = lastPlaylistResponse;
+      });
+      return playlistResponse;
+    }
+    return null;
+  }
+
+  Future<xml.XmlDocument> _serverRequest(String requestType,
+      [Map<String, String> queryParameters]) async {
+    http.Response response;
+    try {
       response = await client.get(
         Uri.http(
           widget.settings.connection.authority,
-          '/requests/status.xml',
+          '/requests/$requestType.xml',
           queryParameters,
         ),
         headers: {
@@ -82,21 +138,21 @@ class _RemoteControlState extends State<RemoteControl> {
         },
       ).timeout(Duration(seconds: 1));
     } catch (e) {
+      _resetPlaylist();
       assert(() {
         print('Error: ${e.runtimeType}');
         return true;
       }());
     }
     setState(() {
-      lastStatusCode = response?.statusCode ?? -1;
+      if (requestType == 'status') {
+        lastStatusResponseCode = response?.statusCode ?? -1;
+      } else if (requestType == 'playlist') {
+        lastPlaylistResponseCode = response?.statusCode ?? -1;
+      }
     });
     if (response?.statusCode == 200) {
-      var statusResponse = VlcStatusResponse(xml.parse(response.body));
-      assert(() {
-        print(statusResponse);
-        return true;
-      }());
-      return statusResponse;
+      return xml.parse(response.body);
     }
     return null;
   }
@@ -107,7 +163,7 @@ class _RemoteControlState extends State<RemoteControl> {
       ticker.cancel();
       message = 'Paused polling for status updates';
     } else {
-      ticker = new Timer.periodic(Duration(seconds: 1), _tick);
+      ticker = new Timer.periodic(Duration(seconds: _tickIntervalSecs), _tick);
       message = 'Resumed polling for status updates';
     }
     Scaffold.of(context).showSnackBar(SnackBar(
@@ -142,32 +198,41 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _tick(timer) async {
+    _updateStateAndPlaylist();
+  }
+
+  _scheduleSingleUpdate() async {
+    if (ticker != null && ticker.isActive) {
+      return; // ticker will do the UI updates, no need to schedule any further update
+    }
+
+    if (delayedTimer != null && delayedTimer.isActive) {
+      delayedTimer.cancel(); // cancel any existing delay timer so the latest state is updated in one shot
+    }
+
+    delayedTimer = new Timer(new Duration(seconds: _tickIntervalSecs), _updateStateAndPlaylist);
+  }
+
+  _resetPlaylist() {
+    playing = null;
+    playlist = null;
+    title = '';
+  }
+
+  _updateStateAndPlaylist() async {
     if (widget.settings.connection.isNotValid) {
+      _resetPlaylist();
       return;
     }
 
-    if (skipNextStatus) {
-      skipNextStatus = false;
+    var statusResponse = await _statusRequest();
+    var playlistResponse = await _playlistRequest();
+
+    if (statusResponse == null || playlistResponse == null) {
+      lastStatusResponse = statusResponse;
+      lastPlaylistResponse = playlistResponse;
       return;
     }
-
-    var response = await _statusRequest();
-
-    if (response == null) {
-      lastStatusResponse = response;
-      return;
-    }
-
-    // TODO Try to detect if the playing file was changed from VLC itself and switch back to default display
-    setState(() {
-      state = response.state;
-      length = response.length;
-      title = response.title;
-      if (!sliding) {
-        time = response.time;
-      }
-      lastStatusResponse = response;
-    });
   }
 
   _openMedia() async {
@@ -188,10 +253,6 @@ class _RemoteControlState extends State<RemoteControl> {
       if (response == null) {
         return;
       }
-      setState(() {
-        playing = result.item;
-        playlist = result.playlist;
-      });
       assert(() {
         print('Playing ${result.item}');
         return true;
@@ -199,17 +260,148 @@ class _RemoteControlState extends State<RemoteControl> {
     }
   }
 
-  _play(BrowseItem item) async {
+  _enqueueMedia() async {
+    BrowseResult result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (context) => OpenMedia(
+            prefs: widget.prefs,
+            settings: widget.settings,
+          )),
+    );
+
+    if (result != null) {
+      var response = await _statusRequest({
+        'command': 'in_enqueue',
+        'input': result.item.uri,
+      });
+      _scheduleSingleUpdate();
+      if (response == null) {
+        return;
+      }
+      assert(() {
+        print('Enqueued ${result.item}');
+        return true;
+      }());
+    }
+  }
+
+  _play(PlaylistItem item) async {
+    // Preempt setting active playlist item
+    if (playing != item) {
+      playing = item;
+    }
+
     var response = await _statusRequest({
-      'command': 'in_play',
-      'input': item.uri,
+      'command': 'pl_play',
+      'id': item.id,
     });
+
+    _scheduleSingleUpdate();
     if (response == null) {
       return;
     }
-    setState(() {
-      playing = item;
+  }
+
+  _previous() async {
+    var response = await _statusRequest({
+      'command': 'pl_previous'
     });
+
+    _scheduleSingleUpdate();
+    if (response == null) {
+      return;
+    }
+  }
+
+  _next() async {
+    var response = await _statusRequest({
+      'command': 'pl_next'
+    });
+
+    _scheduleSingleUpdate();
+    if (response == null) {
+      return;
+    }
+  }
+
+  _delete(PlaylistItem item) async {
+    showDialog(context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: new Text('Remove item from playlist?'),
+          content: new Text(item.title),
+          actions: <Widget>[
+            FlatButton(
+              child: Text("No"),
+              onPressed: () {
+                Navigator.pop(context);
+              }
+            ),
+            FlatButton(
+              child: Text("Yes"),
+              autofocus: true,
+              onPressed: () {
+                var response = _statusRequest({
+                  'command': 'pl_delete',
+                  'id': item.id,
+                });
+
+                _scheduleSingleUpdate();
+                if (response == null) {
+                  return;
+                }
+                Navigator.pop(context);
+              }
+            )
+          ],
+        );
+      }
+    );
+  }
+
+  _emptyPlaylist() async {
+    var response = await _statusRequest({
+      'command': 'pl_empty'
+    });
+
+    _scheduleSingleUpdate();
+    if (response == null) {
+      return;
+    }
+  }
+
+  _toggleRandom() async {
+    var response = await _statusRequest({
+      'command': 'pl_random'
+    });
+
+    _scheduleSingleUpdate();
+    if (response == null) {
+      return;
+    }
+  }
+
+  _toggleRepeat() async {
+    var response = await _statusRequest({
+      'command': 'pl_repeat'
+    });
+
+    _scheduleSingleUpdate();
+    if (response == null) {
+      return;
+    }
+  }
+
+  _toggleLoop() async {
+    var response = await _statusRequest({
+      'command': 'pl_loop'
+    });
+
+    _scheduleSingleUpdate();
+    if (response == null) {
+      return;
+    }
   }
 
   _seekPercent(int percent) async {
@@ -217,6 +409,8 @@ class _RemoteControlState extends State<RemoteControl> {
       'command': 'seek',
       'val': '$percent%',
     });
+
+    _scheduleSingleUpdate();
     if (response == null) {
       return;
     }
@@ -230,6 +424,8 @@ class _RemoteControlState extends State<RemoteControl> {
       'command': 'seek',
       'val': '''${seekTime > 0 ? '+' : ''}${seekTime}S''',
     });
+
+    _scheduleSingleUpdate();
     if (response == null) {
       return;
     }
@@ -237,16 +433,51 @@ class _RemoteControlState extends State<RemoteControl> {
       time = response.time;
     });
   }
+  
+  _volumePercent(int percent) async {
+    var scaledVolume = percent * VolumeSliderScaleFactor;
+    var response = await _statusRequest({
+      'command': 'volume',
+      'val': '$scaledVolume',
+    });
+
+    _scheduleSingleUpdate();
+    if (response == null) {
+      return;
+    }
+    setState(() {
+      volume = response.volume;
+    });
+  }
+  
+  _volumeRelative(int relativeValue) async {
+    if ((volume <= 0 && relativeValue < 0) ||
+        (volume >= 512 && relativeValue > 0))
+      return; // Nothing to do if already min or max
+
+    var response = await _statusRequest({
+      'command': 'volume',
+      'val': '${relativeValue > 0 ? '+' : ''}$relativeValue',
+    });
+
+    _scheduleSingleUpdate();
+    if (response == null) {
+      return;
+    }
+    setState(() {
+      volume = response.volume;
+    });
+  }
 
   _pause() async {
     // Pre-empt the expected state so the button feels more responsive
     setState(() {
       state = (state == 'playing' ? 'paused' : 'playing');
-      skipNextStatus = true;
     });
     _statusRequest({
       'command': 'pl_pause',
     });
+    _scheduleSingleUpdate();
   }
 
   _stop() {
@@ -259,6 +490,11 @@ class _RemoteControlState extends State<RemoteControl> {
     _statusRequest({
       'command': 'pl_stop',
     });
+    _scheduleSingleUpdate();
+  }
+
+  double _volumeSliderValue() {
+    return volume / VolumeSliderScaleFactor;
   }
 
   double _sliderValue() {
@@ -325,6 +561,18 @@ class _RemoteControlState extends State<RemoteControl> {
       case PopupMenuChoice.SUBTITLE_TRACK:
         _chooseSubtitleTrack();
         break;
+      case PopupMenuChoice.RANDOM_PLAY:
+        _toggleRandom();
+        break;
+      case PopupMenuChoice.REPEAT:
+        _toggleRepeat();
+        break;
+      case PopupMenuChoice.LOOP:
+        _toggleLoop();
+        break;
+      case PopupMenuChoice.EMPTY_PLAYLIST:
+        _emptyPlaylist();
+        break;
     }
   }
 
@@ -341,15 +589,22 @@ class _RemoteControlState extends State<RemoteControl> {
                 child: ListTile(
                   contentPadding: EdgeInsets.only(left: 14),
                   dense: widget.settings.dense,
-                  title: Text(
-                    playing?.title ??
-                        cleanTitle(title.split(new RegExp(r'[\\\/]')).last),
+                  title: Text(playing == null && title.isEmpty ? 'VLC Remote' +
+                      (lastStatusResponse != null ? ' (${lastStatusResponse.version})' : '')
+                        : playing?.title ?? cleanTitle(title.split(new RegExp(r'[\\/]')).last),
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      Visibility(
+                        visible: ticker != null ? !ticker.isActive : true,
+                        child: IconButton(
+                          icon: Icon(Icons.refresh),
+                          onPressed: _updateStateAndPlaylist,
+                        ),
+                      ),
                       IconButton(
                         icon: Icon(Icons.settings),
                         onPressed: () {
@@ -369,7 +624,7 @@ class _RemoteControlState extends State<RemoteControl> {
                         },
                       ),
                       Visibility(
-                        visible: lastStatusCode == 200,
+                        visible: lastStatusResponseCode == 200,
                         child: PopupMenuButton<PopupMenuChoice>(
                           onSelected: _onPopupMenuChoice,
                           itemBuilder: (context) {
@@ -388,8 +643,32 @@ class _RemoteControlState extends State<RemoteControl> {
                                     .isNotEmpty,
                               ),
                               PopupMenuItem(
-                                child: Text('Toggle fullscreen'),
+                                child: Text('Turn fullscreen '
+                                  '${lastStatusResponse.fullscreen ? 'OFF' : 'ON'}'),
                                 value: PopupMenuChoice.FULLSCREEN,
+                                enabled: lastStatusResponse != null,
+                              ),
+                              PopupMenuItem(
+                                child: Text('Turn random play '
+                                  '${lastStatusResponse.random ? 'OFF' : 'ON'}'),
+                                value: PopupMenuChoice.RANDOM_PLAY,
+                                enabled: lastStatusResponse != null,
+                              ),
+                              PopupMenuItem(
+                                child: Text('Turn repeat '
+                                  '${lastStatusResponse.repeat ? 'OFF' : 'ON'}'),
+                                value: PopupMenuChoice.REPEAT,
+                                enabled: lastStatusResponse != null,
+                              ),
+                              PopupMenuItem(
+                                child: Text('Turn looping '
+                                    '${lastStatusResponse.loop ? 'OFF' : 'ON'}'),
+                                value: PopupMenuChoice.LOOP,
+                                enabled: lastStatusResponse != null,
+                              ),
+                              PopupMenuItem(
+                                child: Text('Clear playlist'),
+                                value: PopupMenuChoice.EMPTY_PLAYLIST,
                                 enabled: lastStatusResponse != null,
                               ),
                             ];
@@ -412,11 +691,11 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   Widget _body() {
-    if (playlist == null) {
+    if (playlist == null || playlist.isEmpty) {
       return Expanded(
         child: Padding(
           padding: EdgeInsets.all(32),
-          child: lastStatusCode == 200
+          child: lastPlaylistResponseCode == 200
               ? Image.asset('assets/icon-512.png')
               : ConnectionAnimation(),
         ),
@@ -428,20 +707,29 @@ class _RemoteControlState extends State<RemoteControl> {
         itemCount: playlist.length,
         itemBuilder: (context, index) {
           var item = playlist[index];
-          var isPlaying = item.path == playing.path;
+          var isCurrent = item.current;
+          var isPlaying = state == 'playing';
           return ListTile(
             dense: widget.settings.dense,
-            selected: isPlaying,
-            leading: Icon(item.icon),
+            selected: isCurrent,
+            leading: !isCurrent ? Icon(Icons.stop) :
+              (isPlaying ? Icon(Icons.play_arrow) : Icon(Icons.pause)),
             title: Text(
               item.title,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal,
+                fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
               ),
             ),
             onTap: () {
-              _play(item);
+              if (isCurrent) {
+                isPlaying ? _pause() : _play(item);
+              } else {
+                _play(item);
+              }
+            },
+            onLongPress: () {
+              _delete(item);
             },
           );
         },
@@ -451,125 +739,201 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   Widget _footer() {
-    return Container(
-      color: headerFooterBgColor,
-      child: Column(
-        children: <Widget>[
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 14),
-            child: Row(
-              children: <Widget>[
-                Builder(
-                  builder: (context) => GestureDetector(
-                        onTap: () {
-                          _togglePolling(context);
+    return Visibility(
+      visible: widget.settings.connection.isValid && lastStatusResponseCode == 200,
+      child: Container(
+        color: headerFooterBgColor,
+        child: Column(
+          children: <Widget>[
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 14),
+              child: Row(
+                children: <Widget>[
+                  Builder(
+                    builder: (context) => GestureDetector(
+                      onTap: () {
+                        _volumeRelative(-5);
+                      },
+                      onDoubleTap: () {
+                        if (volume > 0) {
+                          _volumePercent(0);
+                        } else {
+                          _volumePercent(100);
+                        }
+                      },
+                      child: Icon(Icons.volume_down)
+                    ),
+                  ),
+                  Flexible(
+                      flex: 1,
+                      child: Slider(
+                        max: 200,
+                        value: _volumeSliderValue(),
+                        onChangeStart: (percent) async {
+                          setState(() {
+                            volumeSliding = true;
+                          });
                         },
-                        child: Text(
-                          state != 'stopped' ? formatTime(time) : '––:––',
-                          style: TextStyle(
-                            color: ticker.isActive
-                                ? Theme.of(context).textTheme.body1.color
-                                : Theme.of(context).disabledColor,
+                        onChanged: (percent) async {
+                          await _volumePercent(percent.round());
+                        },
+                        onChangeEnd: (percent) async {
+                          await _volumePercent(percent.round());
+                          setState(() {
+                            volumeSliding = false;
+                          });
+                        },
+                      )),
+                  Builder(
+                    builder: (context) => GestureDetector(
+                        onTap: () {
+                          _volumeRelative(5);
+                        },
+                        onDoubleTap: () {
+                          if (volume > 0) {
+                            _volumePercent(0);
+                          } else {
+                            _volumePercent(100);
+                          }
+                        },
+                        child: Icon(Icons.volume_up)
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 14),
+              child: Row(
+                children: <Widget>[
+                  Builder(
+                    builder: (context) => GestureDetector(
+                          onTap: () {
+                            _togglePolling(context);
+                          },
+                          child: Text(
+                            state != 'stopped' ? formatTime(time) : '––:––',
+                            style: TextStyle(
+                              color: ticker.isActive
+                                  ? Theme.of(context).textTheme.body1.color
+                                  : Theme.of(context).disabledColor,
+                            ),
                           ),
                         ),
-                      ),
-                ),
-                Flexible(
-                    flex: 1,
-                    child: Slider(
-                      divisions: 100,
-                      max: state != 'stopped' ? 100 : 0,
-                      value: _sliderValue(),
-                      onChangeStart: (percent) {
-                        setState(() {
-                          sliding = true;
-                        });
-                      },
-                      onChanged: (percent) {
-                        setState(() {
-                          time = Duration(
-                            seconds: (length.inSeconds / 100 * percent).round(),
-                          );
-                        });
-                      },
-                      onChangeEnd: (percent) async {
-                        await _seekPercent(percent.round());
-                        setState(() {
-                          sliding = false;
-                        });
-                      },
-                    )),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      showTimeLeft = !showTimeLeft;
-                    });
-                  },
-                  child: Text(
-                    state != 'stopped'
-                        ? showTimeLeft
-                            ? '-' + formatTime(length - time)
-                            : formatTime(length)
-                        : '––:––',
                   ),
-                ),
-              ],
+                  Flexible(
+                      flex: 1,
+                      child: Slider(
+                        divisions: 100,
+                        max: state != 'stopped' ? 100 : 0,
+                        value: _sliderValue(),
+                        onChangeStart: (percent) {
+                          setState(() {
+                            sliding = true;
+                          });
+                        },
+                        onChanged: (percent) {
+                          setState(() {
+                            time = Duration(
+                              seconds: (length.inSeconds / 100 * percent).round(),
+                            );
+                          });
+                        },
+                        onChangeEnd: (percent) async {
+                          await _seekPercent(percent.round());
+                          setState(() {
+                            sliding = false;
+                          });
+                        },
+                      )),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        showTimeLeft = !showTimeLeft;
+                      });
+                    },
+                    child: Text(
+                      state != 'stopped'
+                          ? showTimeLeft
+                              ? '-' + formatTime(length - time)
+                              : formatTime(length)
+                          : '––:––',
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Padding(
-            padding: EdgeInsets.only(left: 9, right: 9, bottom: 6, top: 3),
-            child: Row(
-              // mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: <Widget>[
-                GestureDetector(
-                  child: Icon(
-                    Icons.stop,
-                    size: 30,
+            Padding(
+              padding: EdgeInsets.only(left: 9, right: 9, bottom: 6, top: 3),
+              child: Row(
+                // mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: <Widget>[
+                  GestureDetector(
+                    child: Icon(
+                      Icons.stop,
+                      size: 30,
+                    ),
+                    onTap: _stop,
                   ),
-                  onTap: _stop,
-                ),
-                Expanded(child: VerticalDivider()),
-                GestureDetector(
-                  child: Icon(
-                    Icons.fast_rewind,
-                    size: 30,
+                  Expanded(child: VerticalDivider()),
+                  GestureDetector(
+                    child: Icon(
+                      Icons.skip_previous,
+                      size: 30,
+                    ),
+                    onTap: _previous,
                   ),
-                  onTap: () {
-                    _seekRelative(-10);
-                  },
-                ),
-                Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 10),
-                    child: GestureDetector(
-                      onTap: _pause,
-                      child: Icon(
-                        state == 'paused' || state == 'stopped'
-                            ? Icons.play_arrow
-                            : Icons.pause,
-                        size: 42,
-                      ),
-                    )),
-                GestureDetector(
-                  child: Icon(
-                    Icons.fast_forward,
-                    size: 30,
+                  Expanded(child: VerticalDivider()),
+                  GestureDetector(
+                    child: Icon(
+                      Icons.fast_rewind,
+                      size: 30,
+                    ),
+                    onTap: () {
+                      _seekRelative(-5);
+                    },
                   ),
-                  onTap: () {
-                    _seekRelative(10);
-                  },
-                ),
-                Expanded(child: VerticalDivider()),
-                GestureDetector(
-                  child: Icon(
-                    Icons.eject,
-                    size: 30,
+                  Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 10),
+                      child: GestureDetector(
+                        onTap: _pause,
+                        child: Icon(
+                          state == 'paused' || state == 'stopped'
+                              ? Icons.play_arrow
+                              : Icons.pause,
+                          size: 42,
+                        ),
+                      )),
+                  GestureDetector(
+                    child: Icon(
+                      Icons.fast_forward,
+                      size: 30,
+                    ),
+                    onTap: () {
+                      _seekRelative(5);
+                    },
                   ),
-                  onTap: _openMedia,
-                ),
-              ],
-            ),
-          )
-        ],
+                  Expanded(child: VerticalDivider()),
+                  GestureDetector(
+                    child: Icon(
+                      Icons.skip_next,
+                      size: 30,
+                    ),
+                    onTap: _next,
+                  ),
+                  Expanded(child: VerticalDivider()),
+                  GestureDetector(
+                    child: Icon(
+                      Icons.eject,
+                      size: 30,
+                    ),
+                    onTap: _openMedia,
+                  ),
+                ],
+              ),
+            )
+          ],
+        ),
       ),
     );
   }
