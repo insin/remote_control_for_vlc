@@ -12,123 +12,6 @@ var _videoExtensions = new RegExp(
 var _audioExtensions = new RegExp(
     r'\.(3ga|a52|aac|ac3|adt|adts|aif|aifc|aiff|alac|amr|aob|ape|awb|caf|dts|flac|it|m4a|m4b|m4p|mid|mka|mlp|mod|mpa|mp1|mp2|mp3|mpc|mpga|oga|ogg|oma|opus|ra|ram|rmi|s3m|spx|tta|voc|vqf|w64|wav|wma|wv|xa|xm)$');
 
-var _episode = new RegExp(r's\d\de\d\d', caseSensitive: false);
-
-// From https://en.wikipedia.org/wiki/Pirated_movie_release_types
-var _source = [
-  'ABC',
-  'AMZN',
-  'CBS',
-  'CC',
-  'CW',
-  'DCU',
-  'DSNY',
-  'FREE',
-  'FOX',
-  'HULU',
-  'iP',
-  'LIFE',
-  'MTV',
-  'NBC',
-  'NICK',
-  'NF',
-  'RED',
-  'TF1',
-].map((s) => RegExp.escape(s)).join('|');
-
-var _format = [
-  'CAMRip',
-  'CAM',
-  'TS',
-  'HDTS',
-  'TELESYNC',
-  'PDVD',
-  'PreDVDRip',
-  'WP',
-  'WORKPRINT',
-  'TC',
-  'HDTC',
-  'TELECINE',
-  'PPV',
-  'PPVRip',
-  'SCR',
-  'SCREENER',
-  'DVDSCR',
-  'DVDSCREENER',
-  'BDSCR',
-  'DDC',
-  'R5',
-  'R5.LINE',
-  'R5.AC3.5.1.HQ',
-  'DVDRip',
-  'DVDMux',
-  'DVDR',
-  'DVD-Full',
-  'Full-Rip',
-  'ISO rip',
-  'lossless rip',
-  'untouched rip',
-  'DVD-5',
-  'DVD-9',
-  'DSR',
-  'DSRip',
-  'SATRip',
-  'DTHRip',
-  'DVBRip',
-  'HDTV',
-  'PDTV',
-  'DTVRip',
-  'TVRip',
-  'HDTVRip',
-  'VODRip',
-  'VODR',
-  'WEBDL',
-  'WEB DL',
-  'WEB-DL',
-  'HDRip',
-  'WEB-DLRip',
-  'WEBRip',
-  'WEB Rip',
-  'WEB-Rip',
-  'WEB',
-  'WEB-Cap',
-  'WEBCAP',
-  'WEB Cap',
-  'Blu-Ray',
-  'BluRay',
-  'BDRip',
-  'BRip',
-  'BRRip',
-  'BDMV',
-  'BDR',
-  'BD25',
-  'BD50',
-  'BD5',
-  'BD9',
-].map((s) => RegExp.escape(s)).join('|');
-
-var _year = r'\d{4}';
-
-var _res = r'\d{3,4}p?';
-
-var _movie = new RegExp(
-  '\\.$_year(\\.$_res)?(\\.($_source))?\\.($_format)',
-  caseSensitive: false,
-);
-
-String cleanTitle(String name, {bool keepExt = false}) {
-  if (name == '') {
-    return '';
-  }
-  if (_episode.hasMatch(name)) {
-    return dotsToSpaces(name.substring(0, _episode.firstMatch(name).end));
-  }
-  if (_movie.hasMatch(name)) {
-    return dotsToSpaces(name.substring(0, _movie.firstMatch(name).start));
-  }
-  return dotsToSpaces(name, keepExt: keepExt);
-}
-
 class BrowseItem {
   String type, name, path, uri;
 
@@ -331,20 +214,15 @@ class VlcStatusResponse {
   bool get fullscreen =>
       document.findAllElements('fullscreen').first.text == 'true';
 
-  bool get repeat =>
-      document.findAllElements('repeat').first.text == 'true';
+  bool get repeat => document.findAllElements('repeat').first.text == 'true';
 
-  bool get random =>
-      document.findAllElements('random').first.text == 'true';
+  bool get random => document.findAllElements('random').first.text == 'true';
 
-  bool get loop =>
-      document.findAllElements('loop').first.text == 'true';
+  bool get loop => document.findAllElements('loop').first.text == 'true';
 
-  String get currentPlId =>
-      document.findAllElements('currentplid').first.text;
+  String get currentPlId => document.findAllElements('currentplid').first.text;
 
-  String get version =>
-      document.findAllElements('version').first.text;
+  String get version => document.findAllElements('version').first.text;
 
   List<LanguageTrack> get audioTracks {
     if (_audioTracks == null) {
@@ -419,7 +297,8 @@ class PlaylistItem {
   }
 
   Duration get duration {
-    return Duration(seconds: int.tryParse(leafElement.getAttribute('duration')));
+    return Duration(
+        seconds: int.tryParse(leafElement.getAttribute('duration')));
   }
 
   String get uri {
@@ -436,7 +315,7 @@ class PlaylistItem {
   String toString() {
     return 'PlaylistItem(${{
       'name': name,
-      'title':  title,
+      'title': title,
       'id': id,
       'duration': duration,
       'uri': uri,
@@ -458,9 +337,10 @@ class PlaylistNode {
   }
 
   List<PlaylistItem> get playlistItems {
-    return nodeElement.findElements('leaf').map((el) {
-      return PlaylistItem(el);
-    }).toList();
+    return nodeElement
+        .findElements('leaf')
+        .map((el) => PlaylistItem(el))
+        .toList();
   }
 
   String toString() {
@@ -477,22 +357,25 @@ class VlcPlaylistResponse {
   VlcPlaylistResponse(this.document);
 
   PlaylistItem currentItem;
-  
+
   List<PlaylistItem> get playListItems {
-    var items = document.rootElement.findAllElements('leaf')
-        .map((el) {
-          return PlaylistItem(el);
-        }).toList();
-    currentItem = items.isEmpty ? null :
-                  items.firstWhere((item) { return item.current?? false; });
+    var items = document.rootElement
+        .findAllElements('leaf')
+        .map((el) => PlaylistItem(el))
+        .toList();
+    currentItem = items.isEmpty
+        ? null
+        : items.firstWhere((item) {
+            return item.current ?? false;
+          });
     return items;
   }
 
   List<PlaylistNode> get playlistNodes {
-    return document.rootElement.findElements('node')
-        .map((el) {
-          return PlaylistNode(el);
-        }).toList();
+    return document.rootElement
+        .findElements('node')
+        .map((el) => PlaylistNode(el))
+        .toList();
   }
 
   String toString() {
