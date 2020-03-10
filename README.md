@@ -52,13 +52,17 @@ If VLC Remote was able to successfully connect, the connection info will be save
 
 ## Screenshots
 
+![](screenshots/vlc-connecting.png)
+
 ### Settings
 
 ![](screenshots/settings.png)
 
 ### Browsing for and playing media
 
-When you browse for and select media, it will be enqueued on VLC's playlist.
+Once connected to VLC, tap the ⏏️ button to browse for media️; once selected, it will be enqueued on VLC's playlist.
+
+![](screenshots/vlc-connected.png)
 
 ![](screenshots/open-media.png)
 
