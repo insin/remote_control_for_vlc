@@ -14,8 +14,15 @@ import 'utils.dart';
 
 var headerFooterBgColor = Colors.grey.shade200.withOpacity(0.75);
 
-enum PopupMenuChoice { AUDIO_TRACK, FULLSCREEN, SUBTITLE_TRACK,
-  RANDOM_PLAY, REPEAT, LOOP, EMPTY_PLAYLIST }
+enum PopupMenuChoice {
+  AUDIO_TRACK,
+  FULLSCREEN,
+  SUBTITLE_TRACK,
+  RANDOM_PLAY,
+  REPEAT,
+  LOOP,
+  EMPTY_PLAYLIST
+}
 
 class RemoteControl extends StatefulWidget {
   final SharedPreferences prefs;
@@ -188,11 +195,11 @@ class _RemoteControlState extends State<RemoteControl> {
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
-            title: Text('Turn on Wi-Fi'),
-            content: Text(
-              'A Wi-Fi connection was not detected.\n\nVLC Remote needs to connect to your local network to control VLC.',
-            ),
-          ),
+        title: Text('Turn on Wi-Fi'),
+        content: Text(
+          'A Wi-Fi connection was not detected.\n\nVLC Remote needs to connect to your local network to control VLC.',
+        ),
+      ),
     );
     subscription.cancel();
   }
@@ -207,10 +214,12 @@ class _RemoteControlState extends State<RemoteControl> {
     }
 
     if (delayedTimer != null && delayedTimer.isActive) {
-      delayedTimer.cancel(); // cancel any existing delay timer so the latest state is updated in one shot
+      delayedTimer
+          .cancel(); // cancel any existing delay timer so the latest state is updated in one shot
     }
 
-    delayedTimer = new Timer(new Duration(seconds: _tickIntervalSecs), _updateStateAndPlaylist);
+    delayedTimer = new Timer(
+        new Duration(seconds: _tickIntervalSecs), _updateStateAndPlaylist);
   }
 
   _resetPlaylist() {
@@ -265,9 +274,9 @@ class _RemoteControlState extends State<RemoteControl> {
       context,
       MaterialPageRoute(
           builder: (context) => OpenMedia(
-            prefs: widget.prefs,
-            settings: widget.settings,
-          )),
+                prefs: widget.prefs,
+                settings: widget.settings,
+              )),
     );
 
     if (result != null) {
@@ -304,9 +313,7 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _previous() async {
-    var response = await _statusRequest({
-      'command': 'pl_previous'
-    });
+    var response = await _statusRequest({'command': 'pl_previous'});
 
     _scheduleSingleUpdate();
     if (response == null) {
@@ -315,9 +322,7 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _next() async {
-    var response = await _statusRequest({
-      'command': 'pl_next'
-    });
+    var response = await _statusRequest({'command': 'pl_next'});
 
     _scheduleSingleUpdate();
     if (response == null) {
@@ -326,44 +331,40 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _delete(PlaylistItem item) async {
-    showDialog(context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: new Text('Remove item from playlist?'),
-          content: new Text(item.title),
-          actions: <Widget>[
-            FlatButton(
-              child: Text("No"),
-              onPressed: () {
-                Navigator.pop(context);
-              }
-            ),
-            FlatButton(
-              child: Text("Yes"),
-              autofocus: true,
-              onPressed: () {
-                var response = _statusRequest({
-                  'command': 'pl_delete',
-                  'id': item.id,
-                });
+    showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: new Text('Remove item from playlist?'),
+            content: new Text(item.title),
+            actions: <Widget>[
+              FlatButton(
+                  child: Text("No"),
+                  onPressed: () {
+                    Navigator.pop(context);
+                  }),
+              FlatButton(
+                  child: Text("Yes"),
+                  autofocus: true,
+                  onPressed: () {
+                    var response = _statusRequest({
+                      'command': 'pl_delete',
+                      'id': item.id,
+                    });
 
-                _scheduleSingleUpdate();
-                if (response == null) {
-                  return;
-                }
-                Navigator.pop(context);
-              }
-            )
-          ],
-        );
-      }
-    );
+                    _scheduleSingleUpdate();
+                    if (response == null) {
+                      return;
+                    }
+                    Navigator.pop(context);
+                  })
+            ],
+          );
+        });
   }
 
   _emptyPlaylist() async {
-    var response = await _statusRequest({
-      'command': 'pl_empty'
-    });
+    var response = await _statusRequest({'command': 'pl_empty'});
 
     _scheduleSingleUpdate();
     if (response == null) {
@@ -372,9 +373,7 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _toggleRandom() async {
-    var response = await _statusRequest({
-      'command': 'pl_random'
-    });
+    var response = await _statusRequest({'command': 'pl_random'});
 
     _scheduleSingleUpdate();
     if (response == null) {
@@ -383,9 +382,7 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _toggleRepeat() async {
-    var response = await _statusRequest({
-      'command': 'pl_repeat'
-    });
+    var response = await _statusRequest({'command': 'pl_repeat'});
 
     _scheduleSingleUpdate();
     if (response == null) {
@@ -394,9 +391,7 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _toggleLoop() async {
-    var response = await _statusRequest({
-      'command': 'pl_loop'
-    });
+    var response = await _statusRequest({'command': 'pl_loop'});
 
     _scheduleSingleUpdate();
     if (response == null) {
@@ -433,7 +428,7 @@ class _RemoteControlState extends State<RemoteControl> {
       time = response.time;
     });
   }
-  
+
   _volumePercent(int percent) async {
     var scaledVolume = (percent * VolumeSliderScaleFactor).toInt();
     var response = await _statusRequest({
@@ -449,7 +444,7 @@ class _RemoteControlState extends State<RemoteControl> {
       volume = response.volume;
     });
   }
-  
+
   _volumeRelative(int relativeValue) async {
     if ((volume <= 0 && relativeValue < 0) ||
         (volume >= 512 && relativeValue > 0))
@@ -589,9 +584,14 @@ class _RemoteControlState extends State<RemoteControl> {
                 child: ListTile(
                   contentPadding: EdgeInsets.only(left: 14),
                   dense: widget.settings.dense,
-                  title: Text(playing == null && title.isEmpty ? 'VLC Remote' +
-                      (lastStatusResponse != null ? ' (${lastStatusResponse.version})' : '')
-                        : playing?.title ?? cleanTitle(title.split(new RegExp(r'[\\/]')).last),
+                  title: Text(
+                    playing == null && title.isEmpty
+                        ? 'VLC Remote' +
+                            (lastStatusResponse != null
+                                ? ' (${lastStatusResponse.version})'
+                                : '')
+                        : playing?.title ??
+                            cleanTitle(title.split(new RegExp(r'[\\/]')).last),
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
@@ -612,13 +612,13 @@ class _RemoteControlState extends State<RemoteControl> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => SettingsScreen(
-                                    settings: widget.settings,
-                                    onSettingsChanged: () {
-                                      setState(() {
-                                        widget.settings.save();
-                                      });
-                                    },
-                                  ),
+                                settings: widget.settings,
+                                onSettingsChanged: () {
+                                  setState(() {
+                                    widget.settings.save();
+                                  });
+                                },
+                              ),
                             ),
                           );
                         },
@@ -644,19 +644,19 @@ class _RemoteControlState extends State<RemoteControl> {
                               ),
                               PopupMenuItem(
                                 child: Text('Turn fullscreen '
-                                  '${lastStatusResponse.fullscreen ? 'OFF' : 'ON'}'),
+                                    '${lastStatusResponse.fullscreen ? 'OFF' : 'ON'}'),
                                 value: PopupMenuChoice.FULLSCREEN,
                                 enabled: lastStatusResponse != null,
                               ),
                               PopupMenuItem(
                                 child: Text('Turn random play '
-                                  '${lastStatusResponse.random ? 'OFF' : 'ON'}'),
+                                    '${lastStatusResponse.random ? 'OFF' : 'ON'}'),
                                 value: PopupMenuChoice.RANDOM_PLAY,
                                 enabled: lastStatusResponse != null,
                               ),
                               PopupMenuItem(
                                 child: Text('Turn repeat '
-                                  '${lastStatusResponse.repeat ? 'OFF' : 'ON'}'),
+                                    '${lastStatusResponse.repeat ? 'OFF' : 'ON'}'),
                                 value: PopupMenuChoice.REPEAT,
                                 enabled: lastStatusResponse != null,
                               ),
@@ -712,8 +712,9 @@ class _RemoteControlState extends State<RemoteControl> {
           return ListTile(
             dense: widget.settings.dense,
             selected: isCurrent,
-            leading: !isCurrent ? Icon(Icons.stop) :
-              (isPlaying ? Icon(Icons.play_arrow) : Icon(Icons.pause)),
+            leading: !isCurrent
+                ? Icon(Icons.stop)
+                : (isPlaying ? Icon(Icons.play_arrow) : Icon(Icons.pause)),
             title: Text(
               item.title,
               overflow: TextOverflow.ellipsis,
@@ -740,7 +741,8 @@ class _RemoteControlState extends State<RemoteControl> {
 
   Widget _footer() {
     return Visibility(
-      visible: widget.settings.connection.isValid && lastStatusResponseCode == 200,
+      visible:
+          widget.settings.connection.isValid && lastStatusResponseCode == 200,
       child: Container(
         color: headerFooterBgColor,
         child: Column(
@@ -751,18 +753,17 @@ class _RemoteControlState extends State<RemoteControl> {
                 children: <Widget>[
                   Builder(
                     builder: (context) => GestureDetector(
-                      onTap: () {
-                        _volumeRelative(-5);
-                      },
-                      onDoubleTap: () {
-                        if (volume > 0) {
-                          _volumePercent(0);
-                        } else {
-                          _volumePercent(100);
-                        }
-                      },
-                      child: Icon(Icons.volume_down)
-                    ),
+                        onTap: () {
+                          _volumeRelative(-5);
+                        },
+                        onDoubleTap: () {
+                          if (volume > 0) {
+                            _volumePercent(0);
+                          } else {
+                            _volumePercent(100);
+                          }
+                        },
+                        child: Icon(Icons.volume_down)),
                   ),
                   Flexible(
                       flex: 1,
@@ -796,8 +797,7 @@ class _RemoteControlState extends State<RemoteControl> {
                             _volumePercent(100);
                           }
                         },
-                        child: Icon(Icons.volume_up)
-                    ),
+                        child: Icon(Icons.volume_up)),
                   ),
                 ],
               ),
@@ -808,18 +808,18 @@ class _RemoteControlState extends State<RemoteControl> {
                 children: <Widget>[
                   Builder(
                     builder: (context) => GestureDetector(
-                          onTap: () {
-                            _togglePolling(context);
-                          },
-                          child: Text(
-                            state != 'stopped' ? formatTime(time) : '––:––',
-                            style: TextStyle(
-                              color: ticker.isActive
-                                  ? Theme.of(context).textTheme.body1.color
-                                  : Theme.of(context).disabledColor,
-                            ),
-                          ),
+                      onTap: () {
+                        _togglePolling(context);
+                      },
+                      child: Text(
+                        state != 'stopped' ? formatTime(time) : '––:––',
+                        style: TextStyle(
+                          color: ticker.isActive
+                              ? Theme.of(context).textTheme.body1.color
+                              : Theme.of(context).disabledColor,
                         ),
+                      ),
+                    ),
                   ),
                   Flexible(
                       flex: 1,
@@ -835,7 +835,8 @@ class _RemoteControlState extends State<RemoteControl> {
                         onChanged: (percent) {
                           setState(() {
                             time = Duration(
-                              seconds: (length.inSeconds / 100 * percent).round(),
+                              seconds:
+                                  (length.inSeconds / 100 * percent).round(),
                             );
                           });
                         },
