@@ -33,21 +33,21 @@ For initial setup, VLC Remote will try to pre-fill the start of your LAN IP in t
 You will need to look up your computer's IP address and configure it here:
 
 <details>
-<summary>Looking up your IP on Windows</summary
-<ul>
-<li>Open a Command Prompt</li>
-<li>Type <kbd>ipconfig</kbd> and press enter to run the command</li>
-<li>Look for <code>IPv4 Address</code> in the command's output, which should have an IP address similar to the Host IP setting in the app</li>
-</ul>
+  <summary>Looking up your IP on Windows</summary>
+  <ul>
+    <li>Open a Command Prompt</li>
+    <li>Type <kbd>ipconfig</kbd> and press enter to run the command</li>
+    <li>Look for <code>IPv4 Address</code> in the command's output, which should have an IP address similar to the Host IP setting in the app</li>
+  </ul>
 </details>
 
 <details>
-<summary>Looking up your IP on Linux/Mac</summary>
-<ul>
-<li>Open a Terminal</li>
-<li>Type <kbd>ifconfig</kbd> and press enter to</li>
-<li>Look for <code>eth0</code> in the command's output, which should have an IP address similar to the Host IP setting in the app</li>
-</ul>
+  <summary>Looking up your IP on Linux/Mac</summary>
+  <ul>
+    <li>Open a Terminal</li>
+    <li>Type <kbd>ifconfig</kbd> and press enter to</li>
+    <li>Look for <code>eth0</code> in the command's output, which should have an IP address similar to the Host IP setting in the app</li>
+  </ul>
 </details>
 
 Once you've configured the Host IP address (and the Password if you didn't use `vlcplayer`) click the Test Connection button.
