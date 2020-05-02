@@ -435,7 +435,7 @@ class _RemoteControlState extends State<RemoteControl> {
   }
   
   _volumePercent(int percent) async {
-    var scaledVolume = percent * VolumeSliderScaleFactor;
+    var scaledVolume = (percent * VolumeSliderScaleFactor).toInt();
     var response = await _statusRequest({
       'command': 'volume',
       'val': '$scaledVolume',
