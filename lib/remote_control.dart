@@ -724,7 +724,7 @@ class _RemoteControlState extends State<RemoteControl> {
             ),
             onTap: () {
               if (isCurrent) {
-                isPlaying ? _pause() : _play(item);
+                _pause();
               } else {
                 _play(item);
               }
