@@ -339,12 +339,12 @@ class _RemoteControlState extends State<RemoteControl> {
             content: new Text(item.title),
             actions: <Widget>[
               FlatButton(
-                  child: Text("No"),
+                  child: Text("CANCEL"),
                   onPressed: () {
                     Navigator.pop(context);
                   }),
               FlatButton(
-                  child: Text("Yes"),
+                  child: Text("REMOVE"),
                   autofocus: true,
                   onPressed: () {
                     var response = _statusRequest({
