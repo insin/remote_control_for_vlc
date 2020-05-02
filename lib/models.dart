@@ -367,7 +367,7 @@ class VlcPlaylistResponse {
         ? null
         : items.firstWhere((item) {
             return item.current ?? false;
-          });
+          }, orElse: () => null);
     return items;
   }
 
