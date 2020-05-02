@@ -155,7 +155,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         icon = Icons.error;
         if (response.statusCode == 401) {
           result = 'Password is invalid';
-          description = 'Press and hold the eye icon to check your password';
+          description = 'Tap the eye icon to check your password';
         } else {
           result = 'Unexpected response';
           description = 'Status code: ${response.statusCode}';
