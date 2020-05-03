@@ -106,8 +106,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (await Connectivity().checkConnectivity() == ConnectivityResult.wifi) {
       var ip = await Connectivity().getWifiIP();
       setState(() {
-        prefilledIpSuffix =
-            ip.substring(0, ip.lastIndexOf(new RegExp(r'\.')) + 1);
+        prefilledIpSuffix = ip.substring(0, ip.lastIndexOf(RegExp(r'\.')) + 1);
         ipController.text = prefilledIpSuffix;
       });
     }

@@ -6,10 +6,10 @@ import 'package:xml/xml.dart' as xml;
 
 import 'utils.dart';
 
-var _videoExtensions = new RegExp(
+var _videoExtensions = RegExp(
     r'\.(3g2|3gp|3gp2|3gpp|amv|asf|avi|divx|drc|dv|f4v|flv|gvi|gxf|ismv|iso|m1v|m2v|m2t|m2ts|m4v|mkv|mov|mp2|mp2v|mp4|mp4v|mpe|mpeg|mpeg1|mpeg2|mpeg4|mpg|mpv2|mts|mtv|mxf|mxg|nsv|nut|nuv|ogm|ogv|ogx|ps|rec|rm|rmvb|tod|ts|tts|vob|vro|webm|wm|wmv|wtv|xesc)$');
 
-var _audioExtensions = new RegExp(
+var _audioExtensions = RegExp(
     r'\.(3ga|a52|aac|ac3|adt|adts|aif|aifc|aiff|alac|amr|aob|ape|awb|caf|dts|flac|it|m4a|m4b|m4p|mid|mka|mlp|mod|mpa|mp1|mp2|mp3|mpc|mpga|oga|ogg|oma|opus|ra|ram|rmi|s3m|spx|tta|voc|vqf|w64|wav|wma|wv|xa|xm)$');
 
 class BrowseItem {
@@ -257,7 +257,7 @@ class VlcStatusResponse {
             name = '$description [$language]';
           }
         }
-        tracks.add(new LanguageTrack(
+        tracks.add(LanguageTrack(
             name, int.parse(category.getAttribute('name').split(' ').last)));
       }
     });

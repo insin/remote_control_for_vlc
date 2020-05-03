@@ -62,7 +62,7 @@ class _RemoteControlState extends State<RemoteControl> {
 
   @override
   initState() {
-    ticker = new Timer.periodic(Duration(seconds: _tickIntervalSecs), _tick);
+    ticker = Timer.periodic(Duration(seconds: _tickIntervalSecs), _tick);
     super.initState();
     _checkWifi();
   }
@@ -170,7 +170,7 @@ class _RemoteControlState extends State<RemoteControl> {
       ticker.cancel();
       message = 'Paused polling for status updates';
     } else {
-      ticker = new Timer.periodic(Duration(seconds: _tickIntervalSecs), _tick);
+      ticker = Timer.periodic(Duration(seconds: _tickIntervalSecs), _tick);
       message = 'Resumed polling for status updates';
     }
     Scaffold.of(context).showSnackBar(SnackBar(
@@ -218,8 +218,8 @@ class _RemoteControlState extends State<RemoteControl> {
           .cancel(); // cancel any existing delay timer so the latest state is updated in one shot
     }
 
-    delayedTimer = new Timer(
-        new Duration(seconds: _tickIntervalSecs), _updateStateAndPlaylist);
+    delayedTimer =
+        Timer(Duration(seconds: _tickIntervalSecs), _updateStateAndPlaylist);
   }
 
   _resetPlaylist() {
@@ -335,8 +335,8 @@ class _RemoteControlState extends State<RemoteControl> {
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
-            title: new Text('Remove item from playlist?'),
-            content: new Text(item.title),
+            title: Text('Remove item from playlist?'),
+            content: Text(item.title),
             actions: <Widget>[
               FlatButton(
                   child: Text("CANCEL"),
@@ -591,7 +591,7 @@ class _RemoteControlState extends State<RemoteControl> {
                                 ? ' (${lastStatusResponse.version})'
                                 : '')
                         : playing?.title ??
-                            cleanTitle(title.split(new RegExp(r'[\\/]')).last),
+                            cleanTitle(title.split(RegExp(r'[\\/]')).last),
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
@@ -956,7 +956,7 @@ class _ConnectionAnimationState extends State<ConnectionAnimation>
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     )..repeat();
-    _animation = new IntTween(begin: 0, end: 3).animate(CurvedAnimation(
+    _animation = IntTween(begin: 0, end: 3).animate(CurvedAnimation(
       parent: _controller,
       curve: Curves.easeInOut,
     ));

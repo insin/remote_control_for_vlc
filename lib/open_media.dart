@@ -53,11 +53,11 @@ class _OpenMediaState extends State<OpenMedia> {
       context,
       MaterialPageRoute(
         builder: (context) => FileBrowser(
-              dir: dir,
-              isFave: _isFave,
-              onToggleFave: _toggleFave,
-              settings: widget.settings,
-            ),
+          dir: dir,
+          isFave: _isFave,
+          onToggleFave: _toggleFave,
+          settings: widget.settings,
+        ),
       ),
     );
     if (result != null) {
@@ -117,16 +117,16 @@ class LeaveBehindView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return new Container(
+    return Container(
       color: Colors.red,
       padding: const EdgeInsets.all(16.0),
-      child: new Row(
+      child: Row(
         children: <Widget>[
-          new Icon(Icons.delete, color: Colors.white),
-          new Expanded(
-            child: new Text(''),
+          Icon(Icons.delete, color: Colors.white),
+          Expanded(
+            child: Text(''),
           ),
-          new Icon(Icons.delete, color: Colors.white),
+          Icon(Icons.delete, color: Colors.white),
         ],
       ),
     );

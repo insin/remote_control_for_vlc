@@ -1,6 +1,6 @@
-var _dot = new RegExp(r'\.');
+var _dot = RegExp(r'\.');
 
-var _episode = new RegExp(r's\d\de\d\d', caseSensitive: false);
+var _episode = RegExp(r's\d\de\d\d', caseSensitive: false);
 
 // From https://en.wikipedia.org/wiki/Pirated_movie_release_types#Common_abbreviations
 var _source = [
@@ -112,7 +112,7 @@ var _res = r'\d{3,4}p?';
 // DUBBED, JAPANESE, INDONESIAN etc.
 var _language = r'[A-Z]+';
 
-var _movie = new RegExp(
+var _movie = RegExp(
   '\\.$_year(\\.$_language)?(\\.$_res)?(\\.($_source))?\\.($_format)',
   caseSensitive: false,
 );
