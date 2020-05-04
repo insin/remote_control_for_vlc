@@ -150,4 +150,4 @@ String formatTime(Duration duration) {
  * The interface expects value between 0 and 512 while in the UI it is 0% to 200%.
  * So a factor of 2.56 is used to convert 0% to 200% to a scale of 0 to 512.
  */
-const VolumeSliderScaleFactor = 2.56;
+const volumeSliderScaleFactor = 2.56;

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:connectivity/connectivity.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:just_throttle_it/just_throttle_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xml/xml.dart' as xml;
 
@@ -12,7 +13,8 @@ import 'open_media.dart';
 import 'settings_screen.dart';
 import 'utils.dart';
 
-var headerFooterBgColor = Colors.grey.shade200.withOpacity(0.75);
+var _headerFooterBgColor = Colors.grey.shade200.withOpacity(0.75);
+const _volumeSlidingThrottleMilliseconds = 333;
 
 enum PopupMenuChoice {
   AUDIO_TRACK,
@@ -47,7 +49,7 @@ class _RemoteControlState extends State<RemoteControl> {
   String title = '';
   Duration time = Duration.zero;
   Duration length = Duration.zero;
-  int volume = 0;
+  int volume = 256;
 
   Timer ticker;
   Timer delayedTimer;
@@ -55,6 +57,8 @@ class _RemoteControlState extends State<RemoteControl> {
   bool showTimeLeft = false;
   bool sliding = false;
   bool volumeSliding = false;
+
+  DateTime _ignoreVolumeUpdatesBefore;
 
   List<PlaylistItem> playlist;
   PlaylistItem playing;
@@ -81,17 +85,23 @@ class _RemoteControlState extends State<RemoteControl> {
       print('VlcStatusRequest(${queryParameters ?? {}})');
       return true;
     }());
+    var requestTime = DateTime.now();
     xml.XmlDocument document = await _serverRequest('status', queryParameters);
     if (document != null) {
       var statusResponse = VlcStatusResponse(document);
       assert(() {
-        print(statusResponse);
+        print('${queryParameters ?? {}} response: $statusResponse');
         return true;
       }());
+      var ignoreVolumeUpdates = volumeSliding ||
+          // Volume changes aren't reflected in 'volume' command responses
+          queryParameters != null && queryParameters['command'] == 'volume' ||
+          _ignoreVolumeUpdatesBefore != null &&
+              requestTime.isBefore(_ignoreVolumeUpdatesBefore);
       setState(() {
         state = statusResponse.state;
         length = statusResponse.length;
-        if (!volumeSliding) {
+        if (!ignoreVolumeUpdates && statusResponse.volume != null) {
           volume = statusResponse.volume;
         }
         title = statusResponse.title;
@@ -108,14 +118,14 @@ class _RemoteControlState extends State<RemoteControl> {
 
   Future<VlcPlaylistResponse> _playlistRequest() async {
     assert(() {
-      print('VlcPlaylistRequest()');
+      //print('VlcPlaylistRequest()');
       return true;
     }());
     xml.XmlDocument document = await _serverRequest('playlist', null);
     if (document != null) {
       var playlistResponse = VlcPlaylistResponse(document);
       assert(() {
-        print(playlistResponse);
+        //print(playlistResponse);
         return true;
       }());
       setState(() {
@@ -209,13 +219,14 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _scheduleSingleUpdate() async {
+    // Ticker will do the UI updates, no need to schedule any further update
     if (ticker != null && ticker.isActive) {
-      return; // ticker will do the UI updates, no need to schedule any further update
+      return;
     }
 
+    // Cancel any existing delay timer so the latest state is updated in one shot
     if (delayedTimer != null && delayedTimer.isActive) {
-      delayedTimer
-          .cancel(); // cancel any existing delay timer so the latest state is updated in one shot
+      delayedTimer.cancel();
     }
 
     delayedTimer =
@@ -228,20 +239,14 @@ class _RemoteControlState extends State<RemoteControl> {
     title = '';
   }
 
-  _updateStateAndPlaylist() async {
+  _updateStateAndPlaylist() {
     if (widget.settings.connection.isNotValid) {
       _resetPlaylist();
       return;
     }
 
-    var statusResponse = await _statusRequest();
-    var playlistResponse = await _playlistRequest();
-
-    if (statusResponse == null || playlistResponse == null) {
-      lastStatusResponse = statusResponse;
-      lastPlaylistResponse = playlistResponse;
-      return;
-    }
+    _statusRequest();
+    _playlistRequest();
   }
 
   _openMedia() async {
@@ -429,43 +434,42 @@ class _RemoteControlState extends State<RemoteControl> {
     });
   }
 
-  _volumePercent(int percent) async {
-    var scaledVolume = (percent * VolumeSliderScaleFactor).toInt();
-    var response = await _statusRequest({
-      'command': 'volume',
-      'val': '$scaledVolume',
-    });
+  int _scaleVolumePercent(double percent) =>
+      (percent * volumeSliderScaleFactor).round();
 
-    _scheduleSingleUpdate();
-    if (response == null) {
-      return;
-    }
+  _volumePercent(double percent, {bool finished = true}) {
+    _ignoreVolumeUpdatesBefore = DateTime.now();
+    // Preempt the expected volume
     setState(() {
-      volume = response.volume;
+      volume = _scaleVolumePercent(percent);
     });
+    _statusRequest({
+      'command': 'volume',
+      'val': '${_scaleVolumePercent(percent)}',
+    });
+    if (finished) {
+      _scheduleSingleUpdate();
+    }
   }
 
-  _volumeRelative(int relativeValue) async {
+  _volumeRelative(int relativeValue) {
+    // Nothing to do if already min or max
     if ((volume <= 0 && relativeValue < 0) ||
-        (volume >= 512 && relativeValue > 0))
-      return; // Nothing to do if already min or max
-
-    var response = await _statusRequest({
+        (volume >= 512 && relativeValue > 0)) return;
+    _ignoreVolumeUpdatesBefore = DateTime.now();
+    // Preempt the expected volume
+    setState(() {
+      volume = (volume + relativeValue).clamp(0, 512);
+    });
+    _statusRequest({
       'command': 'volume',
       'val': '${relativeValue > 0 ? '+' : ''}$relativeValue',
     });
-
     _scheduleSingleUpdate();
-    if (response == null) {
-      return;
-    }
-    setState(() {
-      volume = response.volume;
-    });
   }
 
   _pause() async {
-    // Pre-empt the expected state so the button feels more responsive
+    // Preempt the expected state so the button feels more responsive
     setState(() {
       state = (state == 'playing' ? 'paused' : 'playing');
     });
@@ -476,7 +480,7 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _stop() {
-    // Pre-empt the expected state so the button feels more responsive
+    // Preempt the expected state so the button feels more responsive
     setState(() {
       state = 'stopped';
       time = Duration.zero;
@@ -489,7 +493,7 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   double _volumeSliderValue() {
-    return volume / VolumeSliderScaleFactor;
+    return volume / volumeSliderScaleFactor;
   }
 
   double _sliderValue() {
@@ -580,7 +584,7 @@ class _RemoteControlState extends State<RemoteControl> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
               Container(
-                color: headerFooterBgColor,
+                color: _headerFooterBgColor,
                 child: ListTile(
                   contentPadding: EdgeInsets.only(left: 14),
                   dense: widget.settings.dense,
@@ -744,13 +748,14 @@ class _RemoteControlState extends State<RemoteControl> {
       visible:
           widget.settings.connection.isValid && lastStatusResponseCode == 200,
       child: Container(
-        color: headerFooterBgColor,
+        color: _headerFooterBgColor,
         child: Column(
           children: <Widget>[
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 14),
               child: Row(
                 children: <Widget>[
+                  // Volume down
                   Builder(
                     builder: (context) => GestureDetector(
                         onTap: () {
@@ -765,26 +770,35 @@ class _RemoteControlState extends State<RemoteControl> {
                         },
                         child: Icon(Icons.volume_down)),
                   ),
+                  // Volume slider
                   Flexible(
                       flex: 1,
                       child: Slider(
                         max: 200,
                         value: _volumeSliderValue(),
-                        onChangeStart: (percent) async {
+                        onChangeStart: (percent) {
                           setState(() {
                             volumeSliding = true;
                           });
                         },
-                        onChanged: (percent) async {
-                          await _volumePercent(percent.round());
+                        onChanged: (percent) {
+                          setState(() {
+                            volume = _scaleVolumePercent(percent);
+                          });
+                          Throttle.milliseconds(
+                              _volumeSlidingThrottleMilliseconds,
+                              _volumePercent,
+                              [percent],
+                              {#finished: false});
                         },
-                        onChangeEnd: (percent) async {
-                          await _volumePercent(percent.round());
+                        onChangeEnd: (percent) {
+                          _volumePercent(percent);
                           setState(() {
                             volumeSliding = false;
                           });
                         },
                       )),
+                  // Volume up
                   Builder(
                     builder: (context) => GestureDetector(
                         onTap: () {
