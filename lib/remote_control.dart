@@ -109,7 +109,17 @@ class _RemoteControlState extends State<RemoteControl> {
       title = statusResponse.title;
       currentPlId = statusResponse.currentPlId;
       if (!sliding) {
-        time = statusResponse.time;
+        var responseTime = statusResponse.time;
+        // VLC will let time go over and under length using relative seek times
+        // and will send the out-of-range time back to you before it corrects
+        // itself.
+        if (responseTime.isNegative) {
+          time = Duration.zero;
+        } else if (responseTime > length) {
+          time = length;
+        } else {
+          time = responseTime;
+        }
       }
       lastStatusResponse = statusResponse;
     });
@@ -402,19 +412,12 @@ class _RemoteControlState extends State<RemoteControl> {
     });
   }
 
-  _seekRelative(int seekTime) async {
-    var response = await _statusRequest({
+  _seekRelative(int seekTime) {
+    _statusRequest({
       'command': 'seek',
-      'val': '''${seekTime > 0 ? '+' : ''}${seekTime}S''',
+      'val': '${seekTime > 0 ? '+' : ''}${seekTime}S',
     });
-
     _scheduleSingleUpdate();
-    if (response == null) {
-      return;
-    }
-    setState(() {
-      time = response.time;
-    });
   }
 
   int _scaleVolumePercent(double percent) =>
