@@ -199,7 +199,7 @@ class _FileBrowserState extends State<FileBrowser> {
         );
       },
       separatorBuilder: (context, i) {
-        if (_items[i].isDir && _items[i + 1]?.isFile) {
+        if (_items[i].isDir && i < _items.length - 1 && _items[i + 1].isFile) {
           return Divider();
         }
         return SizedBox.shrink();
