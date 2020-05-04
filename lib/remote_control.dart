@@ -95,13 +95,20 @@ class _RemoteControlState extends State<RemoteControl> {
       print('${queryParameters ?? {}} response: $statusResponse');
       return true;
     }());
+    // State changes aren't reflected in commands which start and stop playback
+    var ignoreStateUpdates = queryParameters != null &&
+        (queryParameters['command'] == 'pl_play' ||
+            queryParameters['command'] == 'pl_pause' ||
+            queryParameters['command'] == 'pl_stop');
     var ignoreVolumeUpdates = volumeSliding ||
         // Volume changes aren't reflected in 'volume' command responses
         queryParameters != null && queryParameters['command'] == 'volume' ||
         _ignoreVolumeUpdatesBefore != null &&
             requestTime.isBefore(_ignoreVolumeUpdatesBefore);
     setState(() {
-      state = statusResponse.state;
+      if (!ignoreStateUpdates) {
+        state = statusResponse.state;
+      }
       length = statusResponse.length;
       if (!ignoreVolumeUpdates && statusResponse.volume != null) {
         volume = statusResponse.volume;
@@ -310,39 +317,26 @@ class _RemoteControlState extends State<RemoteControl> {
     }
   }
 
-  _play(PlaylistItem item) async {
+  _play(PlaylistItem item) {
     // Preempt setting active playlist item
     if (playing != item) {
       playing = item;
     }
-
-    var response = await _statusRequest({
+    _statusRequest({
       'command': 'pl_play',
       'id': item.id,
     });
-
     _scheduleSingleUpdate();
-    if (response == null) {
-      return;
-    }
   }
 
-  _previous() async {
-    var response = await _statusRequest({'command': 'pl_previous'});
-
+  _previous() {
+    _statusRequest({'command': 'pl_previous'});
     _scheduleSingleUpdate();
-    if (response == null) {
-      return;
-    }
   }
 
-  _next() async {
-    var response = await _statusRequest({'command': 'pl_next'});
-
+  _next() {
+    _statusRequest({'command': 'pl_next'});
     _scheduleSingleUpdate();
-    if (response == null) {
-      return;
-    }
   }
 
   _delete(PlaylistItem item) async {
@@ -392,24 +386,17 @@ class _RemoteControlState extends State<RemoteControl> {
     _scheduleSingleUpdate();
   }
 
-  _toggleLoop() async {
+  _toggleLoop() {
     _statusRequest({'command': 'pl_loop'});
     _scheduleSingleUpdate();
   }
 
   _seekPercent(int percent) async {
-    var response = await _statusRequest({
+    _statusRequest({
       'command': 'seek',
       'val': '$percent%',
     });
-
     _scheduleSingleUpdate();
-    if (response == null) {
-      return;
-    }
-    setState(() {
-      time = response.time;
-    });
   }
 
   _seekRelative(int seekTime) {
@@ -466,15 +453,7 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _stop() {
-    // Preempt the expected state so the button feels more responsive
-    setState(() {
-      state = 'stopped';
-      time = Duration.zero;
-      length = Duration.zero;
-    });
-    _statusRequest({
-      'command': 'pl_stop',
-    });
+    _statusRequest({'command': 'pl_stop'});
     _scheduleSingleUpdate();
   }
 
@@ -857,7 +836,7 @@ class _RemoteControlState extends State<RemoteControl> {
                       });
                     },
                     child: Text(
-                      state != 'stopped'
+                      state != 'stopped' && length != Duration.zero
                           ? showTimeLeft
                               ? '-' + formatTime(length - time)
                               : formatTime(length)
