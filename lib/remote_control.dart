@@ -87,33 +87,33 @@ class _RemoteControlState extends State<RemoteControl> {
     }());
     var requestTime = DateTime.now();
     xml.XmlDocument document = await _serverRequest('status', queryParameters);
-    if (document != null) {
-      var statusResponse = VlcStatusResponse(document);
-      assert(() {
-        print('${queryParameters ?? {}} response: $statusResponse');
-        return true;
-      }());
-      var ignoreVolumeUpdates = volumeSliding ||
-          // Volume changes aren't reflected in 'volume' command responses
-          queryParameters != null && queryParameters['command'] == 'volume' ||
-          _ignoreVolumeUpdatesBefore != null &&
-              requestTime.isBefore(_ignoreVolumeUpdatesBefore);
-      setState(() {
-        state = statusResponse.state;
-        length = statusResponse.length;
-        if (!ignoreVolumeUpdates && statusResponse.volume != null) {
-          volume = statusResponse.volume;
-        }
-        title = statusResponse.title;
-        currentPlId = statusResponse.currentPlId;
-        if (!sliding) {
-          time = statusResponse.time;
-        }
-        lastStatusResponse = statusResponse;
-      });
-      return statusResponse;
+    if (document == null) {
+      return null;
     }
-    return null;
+    var statusResponse = VlcStatusResponse(document);
+    assert(() {
+      print('${queryParameters ?? {}} response: $statusResponse');
+      return true;
+    }());
+    var ignoreVolumeUpdates = volumeSliding ||
+        // Volume changes aren't reflected in 'volume' command responses
+        queryParameters != null && queryParameters['command'] == 'volume' ||
+        _ignoreVolumeUpdatesBefore != null &&
+            requestTime.isBefore(_ignoreVolumeUpdatesBefore);
+    setState(() {
+      state = statusResponse.state;
+      length = statusResponse.length;
+      if (!ignoreVolumeUpdates && statusResponse.volume != null) {
+        volume = statusResponse.volume;
+      }
+      title = statusResponse.title;
+      currentPlId = statusResponse.currentPlId;
+      if (!sliding) {
+        time = statusResponse.time;
+      }
+      lastStatusResponse = statusResponse;
+    });
+    return statusResponse;
   }
 
   Future<VlcPlaylistResponse> _playlistRequest() async {
@@ -122,20 +122,20 @@ class _RemoteControlState extends State<RemoteControl> {
       return true;
     }());
     xml.XmlDocument document = await _serverRequest('playlist', null);
-    if (document != null) {
-      var playlistResponse = VlcPlaylistResponse(document);
-      assert(() {
-        //print(playlistResponse);
-        return true;
-      }());
-      setState(() {
-        playlist = playlistResponse.playListItems;
-        playing = playlistResponse.currentItem;
-        lastPlaylistResponse = lastPlaylistResponse;
-      });
-      return playlistResponse;
+    if (document == null) {
+      return null;
     }
-    return null;
+    var playlistResponse = VlcPlaylistResponse(document);
+    assert(() {
+      //print(playlistResponse);
+      return true;
+    }());
+    setState(() {
+      playlist = playlistResponse.playListItems;
+      playing = playlistResponse.currentItem;
+      lastPlaylistResponse = lastPlaylistResponse;
+    });
+    return playlistResponse;
   }
 
   Future<xml.XmlDocument> _serverRequest(String requestType,
@@ -337,71 +337,54 @@ class _RemoteControlState extends State<RemoteControl> {
 
   _delete(PlaylistItem item) async {
     showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text('Remove item from playlist?'),
-            content: Text(item.title),
-            actions: <Widget>[
-              FlatButton(
-                  child: Text("CANCEL"),
-                  onPressed: () {
-                    Navigator.pop(context);
-                  }),
-              FlatButton(
-                  child: Text("REMOVE"),
-                  autofocus: true,
-                  onPressed: () {
-                    var response = _statusRequest({
-                      'command': 'pl_delete',
-                      'id': item.id,
-                    });
-
-                    _scheduleSingleUpdate();
-                    if (response == null) {
-                      return;
-                    }
-                    Navigator.pop(context);
-                  })
-            ],
-          );
-        });
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Remove item from playlist?'),
+          content: Text(item.title),
+          actions: <Widget>[
+            FlatButton(
+              child: Text("CANCEL"),
+              onPressed: () {
+                Navigator.pop(context);
+              },
+            ),
+            FlatButton(
+              child: Text("REMOVE"),
+              autofocus: true,
+              onPressed: () {
+                _statusRequest({
+                  'command': 'pl_delete',
+                  'id': item.id,
+                });
+                _scheduleSingleUpdate();
+                Navigator.pop(context);
+              },
+            )
+          ],
+        );
+      },
+    );
   }
 
-  _emptyPlaylist() async {
-    var response = await _statusRequest({'command': 'pl_empty'});
-
+  _emptyPlaylist() {
+    _statusRequest({'command': 'pl_empty'});
     _scheduleSingleUpdate();
-    if (response == null) {
-      return;
-    }
   }
 
-  _toggleRandom() async {
-    var response = await _statusRequest({'command': 'pl_random'});
-
+  _toggleRandom() {
+    _statusRequest({'command': 'pl_random'});
     _scheduleSingleUpdate();
-    if (response == null) {
-      return;
-    }
   }
 
-  _toggleRepeat() async {
-    var response = await _statusRequest({'command': 'pl_repeat'});
-
+  _toggleRepeat() {
+    _statusRequest({'command': 'pl_repeat'});
     _scheduleSingleUpdate();
-    if (response == null) {
-      return;
-    }
   }
 
   _toggleLoop() async {
-    var response = await _statusRequest({'command': 'pl_loop'});
-
+    _statusRequest({'command': 'pl_loop'});
     _scheduleSingleUpdate();
-    if (response == null) {
-      return;
-    }
   }
 
   _seekPercent(int percent) async {
@@ -468,7 +451,7 @@ class _RemoteControlState extends State<RemoteControl> {
     _scheduleSingleUpdate();
   }
 
-  _pause() async {
+  _pause() {
     // Preempt the expected state so the button feels more responsive
     setState(() {
       state = (state == 'playing' ? 'paused' : 'playing');
@@ -758,60 +741,63 @@ class _RemoteControlState extends State<RemoteControl> {
                   // Volume down
                   Builder(
                     builder: (context) => GestureDetector(
-                        onTap: () {
-                          _volumeRelative(-5);
-                        },
-                        onDoubleTap: () {
-                          if (volume > 0) {
-                            _volumePercent(0);
-                          } else {
-                            _volumePercent(100);
-                          }
-                        },
-                        child: Icon(Icons.volume_down)),
+                      onTap: () {
+                        _volumeRelative(-5);
+                      },
+                      onDoubleTap: () {
+                        if (volume > 0) {
+                          _volumePercent(0);
+                        } else {
+                          _volumePercent(100);
+                        }
+                      },
+                      child: Icon(Icons.volume_down),
+                    ),
                   ),
                   // Volume slider
                   Flexible(
-                      flex: 1,
-                      child: Slider(
-                        max: 200,
-                        value: _volumeSliderValue(),
-                        onChangeStart: (percent) {
-                          setState(() {
-                            volumeSliding = true;
-                          });
-                        },
-                        onChanged: (percent) {
-                          setState(() {
-                            volume = _scaleVolumePercent(percent);
-                          });
-                          Throttle.milliseconds(
-                              _volumeSlidingThrottleMilliseconds,
-                              _volumePercent,
-                              [percent],
-                              {#finished: false});
-                        },
-                        onChangeEnd: (percent) {
-                          _volumePercent(percent);
-                          setState(() {
-                            volumeSliding = false;
-                          });
-                        },
-                      )),
+                    flex: 1,
+                    child: Slider(
+                      max: 200,
+                      value: _volumeSliderValue(),
+                      onChangeStart: (percent) {
+                        setState(() {
+                          volumeSliding = true;
+                        });
+                      },
+                      onChanged: (percent) {
+                        setState(() {
+                          volume = _scaleVolumePercent(percent);
+                        });
+                        Throttle.milliseconds(
+                            _volumeSlidingThrottleMilliseconds,
+                            _volumePercent,
+                            [percent],
+                            {#finished: false});
+                      },
+                      onChangeEnd: (percent) {
+                        _volumePercent(percent);
+                        setState(() {
+                          volumeSliding = false;
+                        });
+                      },
+                    ),
+                  ),
                   // Volume up
                   Builder(
                     builder: (context) => GestureDetector(
-                        onTap: () {
-                          _volumeRelative(5);
-                        },
-                        onDoubleTap: () {
-                          if (volume > 0) {
-                            _volumePercent(0);
-                          } else {
-                            _volumePercent(100);
-                          }
-                        },
-                        child: Icon(Icons.volume_up)),
+                      onTap: () {
+                        _volumeRelative(5);
+                      },
+                      onDoubleTap: () {
+                        if (volume > 0) {
+                          _volumePercent(0);
+                        } else {
+                          _volumePercent(100);
+                        }
+                      },
+                      child: Icon(Icons.volume_up),
+                    ),
                   ),
                 ],
               ),
@@ -836,31 +822,31 @@ class _RemoteControlState extends State<RemoteControl> {
                     ),
                   ),
                   Flexible(
-                      flex: 1,
-                      child: Slider(
-                        divisions: 100,
-                        max: state != 'stopped' ? 100 : 0,
-                        value: _sliderValue(),
-                        onChangeStart: (percent) {
-                          setState(() {
-                            sliding = true;
-                          });
-                        },
-                        onChanged: (percent) {
-                          setState(() {
-                            time = Duration(
-                              seconds:
-                                  (length.inSeconds / 100 * percent).round(),
-                            );
-                          });
-                        },
-                        onChangeEnd: (percent) async {
-                          await _seekPercent(percent.round());
-                          setState(() {
-                            sliding = false;
-                          });
-                        },
-                      )),
+                    flex: 1,
+                    child: Slider(
+                      divisions: 100,
+                      max: state != 'stopped' ? 100 : 0,
+                      value: _sliderValue(),
+                      onChangeStart: (percent) {
+                        setState(() {
+                          sliding = true;
+                        });
+                      },
+                      onChanged: (percent) {
+                        setState(() {
+                          time = Duration(
+                            seconds: (length.inSeconds / 100 * percent).round(),
+                          );
+                        });
+                      },
+                      onChangeEnd: (percent) async {
+                        await _seekPercent(percent.round());
+                        setState(() {
+                          sliding = false;
+                        });
+                      },
+                    ),
+                  ),
                   GestureDetector(
                     onTap: () {
                       setState(() {
