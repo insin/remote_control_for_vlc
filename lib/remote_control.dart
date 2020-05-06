@@ -111,7 +111,7 @@ class _RemoteControlState extends State<RemoteControl> {
       }
       length = statusResponse.length;
       if (!ignoreVolumeUpdates && statusResponse.volume != null) {
-        volume = statusResponse.volume;
+        volume = statusResponse.volume.clamp(0, 512);
       }
       title = statusResponse.title;
       currentPlId = statusResponse.currentPlId;
@@ -724,7 +724,7 @@ class _RemoteControlState extends State<RemoteControl> {
                   Builder(
                     builder: (context) => GestureDetector(
                       onTap: () {
-                        _volumeRelative(-5);
+                        _volumeRelative(-25);
                       },
                       onDoubleTap: () {
                         if (volume > 0) {
@@ -740,6 +740,8 @@ class _RemoteControlState extends State<RemoteControl> {
                   Flexible(
                     flex: 1,
                     child: Slider(
+                      label: '${_volumeSliderValue().round()}%',
+                      divisions: 200,
                       max: 200,
                       value: _volumeSliderValue(),
                       onChangeStart: (percent) {
@@ -769,7 +771,7 @@ class _RemoteControlState extends State<RemoteControl> {
                   Builder(
                     builder: (context) => GestureDetector(
                       onTap: () {
-                        _volumeRelative(5);
+                        _volumeRelative(25);
                       },
                       onDoubleTap: () {
                         if (volume > 0) {
