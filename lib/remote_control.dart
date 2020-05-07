@@ -285,40 +285,22 @@ class _RemoteControlState extends State<RemoteControl> {
       ),
     );
 
-    if (result == null) {
-      return;
-    }
-
-    _statusRequest({
-      'command': 'in_play',
-      'input': result.item.uri,
-    });
-  }
-
-  _enqueueMedia() async {
-    BrowseResult result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-          builder: (context) => OpenMedia(
-                prefs: widget.prefs,
-                settings: widget.settings,
-              )),
-    );
 
     if (result == null) {
       return;
     }
 
     _statusRequest({
-      'command': 'in_enqueue',
-      'input': result.item.uri,
+      'command':
+          result.intent == BrowseResultIntent.play ? 'in_play' : 'in_enqueue',
+      'input': result.item.playlistUri,
     });
     _scheduleSingleUpdate();
   }
 
   _play(PlaylistItem item) {
     // Preempt setting active playlist item
-    if (playing != item) {
+    if (playing != item && item.isMedia) {
       playing = item;
     }
     _statusRequest({

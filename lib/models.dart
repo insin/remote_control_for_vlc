@@ -22,6 +22,13 @@ class BrowseItem {
     this.uri,
   );
 
+  /// Sending a directory: url when enqueueing makes a directory display as directory in the VLC
+  /// playlist instead of as a generic file.
+  String get playlistUri {
+    if (isDir) return uri.replaceAll(RegExp(r'^file'), 'directory');
+    return uri;
+  }
+
   IconData get icon {
     if (isDir) {
       return Icons.folder;
@@ -63,9 +70,12 @@ class BrowseItem {
   String toString() => 'BrowseItem(${toJson()})';
 }
 
+enum BrowseResultIntent { play, enqueue }
+
 class BrowseResult {
   BrowseItem item;
-  BrowseResult(this.item);
+  BrowseResultIntent intent;
+  BrowseResult(this.item, this.intent);
 }
 
 // ignore: unused_element
