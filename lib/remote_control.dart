@@ -452,27 +452,40 @@ class _RemoteControlState extends State<RemoteControl> {
     return (time.inSeconds / length.inSeconds * 100);
   }
 
-  Future<LanguageTrack> _chooseLanguageTrack(List<LanguageTrack> options) {
+  Future<LanguageTrack> _chooseLanguageTrack(List<LanguageTrack> options,
+      {bool allowNone = false}) {
+    var dialogOptions = options
+        .map((option) => SimpleDialogOption(
+              onPressed: () {
+                Navigator.pop(context, option);
+              },
+              child: Text(option.name),
+            ))
+        .toList();
+    if (allowNone) {
+      dialogOptions.insert(
+          0,
+          SimpleDialogOption(
+            onPressed: () {
+              Navigator.pop(context, LanguageTrack('(None)', -1));
+            },
+            child: Text('(None)'),
+          ));
+    }
     return showDialog<LanguageTrack>(
       context: context,
       builder: (BuildContext context) {
         return SimpleDialog(
-          children: options
-              .map((option) => SimpleDialogOption(
-                    onPressed: () {
-                      Navigator.pop(context, option);
-                    },
-                    child: Text(option.name),
-                  ))
-              .toList(),
+          children: dialogOptions,
         );
       },
     );
   }
 
   void _chooseSubtitleTrack() async {
-    LanguageTrack subtitleTrack =
-        await _chooseLanguageTrack(lastStatusResponse.subtitleTracks);
+    LanguageTrack subtitleTrack = await _chooseLanguageTrack(
+        lastStatusResponse.subtitleTracks,
+        allowNone: true);
     if (subtitleTrack != null) {
       _statusRequest({
         'command': 'subtitle_track',
@@ -583,7 +596,7 @@ class _RemoteControlState extends State<RemoteControl> {
                           visible: ticker != null ? !ticker.isActive : true,
                           child: IconButton(
                             icon: Icon(Icons.refresh),
-                            onPressed: _updateStateAndPlaylist,
+                            onPressed: _updateStatusAndPlaylist,
                             tooltip: 'Refresh VLC status',
                           ),
                         ),
