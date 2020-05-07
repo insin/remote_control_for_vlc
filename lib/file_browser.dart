@@ -71,7 +71,7 @@ class _FileBrowserState extends State<FileBrowser> {
     List<BrowseItem> files = [];
 
     if (response.statusCode == 200) {
-      var document = xml.parse(response.body);
+      var document = xml.parse(utf8.decode(response.bodyBytes));
       document.findAllElements('element').forEach((el) {
         var item = BrowseItem(
           el.getAttribute('type'),

@@ -194,7 +194,7 @@ class _RemoteControlState extends State<RemoteControl> {
       }
     });
     if (response?.statusCode == 200) {
-      return xml.parse(response.body);
+      return xml.parse(utf8.decode(response.bodyBytes));
     }
     return null;
   }
