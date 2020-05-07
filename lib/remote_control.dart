@@ -799,7 +799,7 @@ class _RemoteControlState extends State<RemoteControl> {
                         state != 'stopped' ? formatTime(time) : '––:––',
                         style: TextStyle(
                           color: ticker.isActive
-                              ? Theme.of(context).textTheme.body1.color
+                              ? Theme.of(context).textTheme.bodyText2.color
                               : Theme.of(context).disabledColor,
                         ),
                       ),

@@ -83,7 +83,7 @@ class _OpenMediaState extends State<OpenMedia> {
         Divider(),
         ListTile(
           dense: widget.settings.dense,
-          title: Text('Starred', style: Theme.of(context).textTheme.subtitle),
+          title: Text('Starred', style: Theme.of(context).textTheme.subtitle2),
         ),
       ]);
       listItems.addAll(_faves.map((item) => Dismissible(

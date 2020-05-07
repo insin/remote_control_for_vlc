@@ -190,7 +190,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           dense: widget.settings.dense,
           title: Text(
             'VLC connection',
-            style: Theme.of(context).textTheme.subhead,
+            style: Theme.of(context).textTheme.subtitle1,
           ),
         ),
         ListTile(
@@ -293,7 +293,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           dense: widget.settings.dense,
           title: Text(
             'Display options',
-            style: Theme.of(context).textTheme.subhead,
+            style: Theme.of(context).textTheme.subtitle1,
           ),
         ),
         SwitchListTile(

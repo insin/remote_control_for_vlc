@@ -19,11 +19,11 @@ void main() async {
     Zone.current.handleUncaughtError(details.exception, details.stack);
   };
 
-  runZoned<Future<void>>(() async {
+  runZonedGuarded<Future<void>>(() async {
     WidgetsFlutterBinding.ensureInitialized();
     var prefs = await SharedPreferences.getInstance();
     runApp(VlcRemote(prefs: prefs, settings: Settings(prefs)));
-  }, onError: (error, stackTrace) async {
+  }, (error, stackTrace) async {
     if (showingErrorDialog ||
         navigatorKey?.currentState?.overlay?.context == null) {
       return;
