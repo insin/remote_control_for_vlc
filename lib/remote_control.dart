@@ -601,7 +601,8 @@ class _RemoteControlState extends State<RemoteControl> {
                                   ? ' (${lastStatusResponse.version})'
                                   : '')
                           : playing?.title ??
-                              cleanTitle(title.split(RegExp(r'[\\/]')).last),
+                              cleanVideoTitle(
+                                  title.split(RegExp(r'[\\/]')).last),
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
@@ -753,7 +754,7 @@ class _RemoteControlState extends State<RemoteControl> {
                         item.current ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
-                trailing: !item.isDir ? Text(formatTime(item.duration)) : null,
+                trailing: item.isMedia ? Text(formatTime(item.duration)) : null,
                 onTap: () {
                   if (item.current) {
                     _pause();

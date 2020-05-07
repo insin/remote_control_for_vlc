@@ -117,7 +117,7 @@ var _movie = RegExp(
   caseSensitive: false,
 );
 
-String cleanTitle(String name, {bool keepExt = false}) {
+String cleanVideoTitle(String name, {bool keepExt = false}) {
   if (name == '') {
     return '';
   }

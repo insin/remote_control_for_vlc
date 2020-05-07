@@ -42,6 +42,11 @@ class _FileBrowserState extends State<FileBrowser> {
 
     http.Response response;
 
+    assert(() {
+      print('/requests/browse.xml?uri=${dir.uri}');
+      return true;
+    }());
+
     try {
       response = await http.get(
         Uri.http(widget.settings.connection.authority, '/requests/browse.xml', {

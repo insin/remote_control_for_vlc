@@ -45,7 +45,7 @@ class BrowseItem {
 
   bool get isSupportedMedia => isAudio || isVideo;
 
-  String get title => cleanTitle(name, keepExt: isFile);
+  String get title => isVideo ? cleanVideoTitle(name, keepExt: isFile) : name;
 
   BrowseItem.fromJson(Map<String, dynamic> json)
       : type = json['type'],
@@ -314,9 +314,11 @@ class PlaylistItem {
 
   bool get isFile => uri.startsWith('file:');
 
+  bool get isMedia => isAudio || isVideo;
+
   bool get isVideo => _videoExtensions.hasMatch(uri);
 
-  String get title => cleanTitle(name, keepExt: false);
+  String get title => isVideo ? cleanVideoTitle(name, keepExt: false) : name;
 
   String toString() {
     return 'PlaylistItem(${{
