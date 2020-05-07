@@ -13,7 +13,7 @@ import 'open_media.dart';
 import 'settings_screen.dart';
 import 'utils.dart';
 
-var _headerFooterBgColor = Colors.grey.shade200.withOpacity(0.75);
+var _headerFooterBgColor = Color.fromRGBO(241, 241, 241, 1.0);
 const _volumeSlidingThrottleMilliseconds = 333;
 
 enum PopupMenuChoice {
@@ -49,16 +49,20 @@ class _RemoteControlState extends State<RemoteControl> {
   String title = '';
   Duration time = Duration.zero;
   Duration length = Duration.zero;
-  int volume = 256;
 
   Timer ticker;
   Timer delayedTimer;
   static const _tickIntervalSecs = 1;
   bool showTimeLeft = false;
   bool sliding = false;
-  bool volumeSliding = false;
 
+  int _volume = 256;
+  int _preMuteVolume;
+  bool _volumeSliding = false;
   DateTime _ignoreVolumeUpdatesBefore;
+  bool _showVolumeControls = false;
+  bool _animatingVolumeControls = false;
+  Timer _hideVolumeControlsTimer;
 
   List<PlaylistItem> playlist;
   PlaylistItem playing;
@@ -95,23 +99,26 @@ class _RemoteControlState extends State<RemoteControl> {
       print('${queryParameters ?? {}} response: $statusResponse');
       return true;
     }());
+
     // State changes aren't reflected in commands which start and stop playback
     var ignoreStateUpdates = queryParameters != null &&
         (queryParameters['command'] == 'pl_play' ||
             queryParameters['command'] == 'pl_pause' ||
             queryParameters['command'] == 'pl_stop');
-    var ignoreVolumeUpdates = volumeSliding ||
+
+    var ignoreVolumeUpdates = _volumeSliding ||
         // Volume changes aren't reflected in 'volume' command responses
         queryParameters != null && queryParameters['command'] == 'volume' ||
         _ignoreVolumeUpdatesBefore != null &&
             requestTime.isBefore(_ignoreVolumeUpdatesBefore);
+
     setState(() {
       if (!ignoreStateUpdates) {
         state = statusResponse.state;
       }
       length = statusResponse.length;
       if (!ignoreVolumeUpdates && statusResponse.volume != null) {
-        volume = statusResponse.volume.clamp(0, 512);
+        _volume = statusResponse.volume.clamp(0, 512);
       }
       title = statusResponse.title;
       currentPlId = statusResponse.currentPlId;
@@ -130,6 +137,7 @@ class _RemoteControlState extends State<RemoteControl> {
       }
       lastStatusResponse = statusResponse;
     });
+
     return statusResponse;
   }
 
@@ -414,7 +422,7 @@ class _RemoteControlState extends State<RemoteControl> {
     _ignoreVolumeUpdatesBefore = DateTime.now();
     // Preempt the expected volume
     setState(() {
-      volume = _scaleVolumePercent(percent);
+      _volume = _scaleVolumePercent(percent);
     });
     _statusRequest({
       'command': 'volume',
@@ -427,12 +435,15 @@ class _RemoteControlState extends State<RemoteControl> {
 
   _volumeRelative(int relativeValue) {
     // Nothing to do if already min or max
-    if ((volume <= 0 && relativeValue < 0) ||
-        (volume >= 512 && relativeValue > 0)) return;
+    if ((_volume <= 0 && relativeValue < 0) ||
+        (_volume >= 512 && relativeValue > 0)) return;
     _ignoreVolumeUpdatesBefore = DateTime.now();
     // Preempt the expected volume
     setState(() {
-      volume = (volume + relativeValue).clamp(0, 512);
+      _volume = (_volume + relativeValue).clamp(0, 512);
+      if (_volume == 0) {
+        _preMuteVolume = null;
+      }
     });
     _statusRequest({
       'command': 'volume',
@@ -458,7 +469,7 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   double _volumeSliderValue() {
-    return volume / volumeSliderScaleFactor;
+    return _volume / volumeSliderScaleFactor;
   }
 
   double _sliderValue() {
@@ -512,6 +523,34 @@ class _RemoteControlState extends State<RemoteControl> {
     _statusRequest({
       'command': 'fullscreen',
     });
+  }
+
+  void _toggleVolumeControls([bool show]) {
+    if (show == null) {
+      show = !_showVolumeControls;
+    }
+    setState(() {
+      _showVolumeControls = show;
+      _animatingVolumeControls = true;
+    });
+    if (show == true) {
+      _scheduleHidingVolumeControls();
+    } else {
+      _cancelHidingVolumeControls();
+    }
+  }
+
+  void _cancelHidingVolumeControls() {
+    if (_hideVolumeControlsTimer != null && _hideVolumeControlsTimer.isActive) {
+      _hideVolumeControlsTimer.cancel();
+      _hideVolumeControlsTimer = null;
+    }
+  }
+
+  void _scheduleHidingVolumeControls([int seconds = 4]) {
+    _cancelHidingVolumeControls();
+    _hideVolumeControlsTimer =
+        Timer(Duration(seconds: seconds), () => _toggleVolumeControls(false));
   }
 
   void _onPopupMenuChoice(PopupMenuChoice choice) {
@@ -650,7 +689,9 @@ class _RemoteControlState extends State<RemoteControl> {
               ),
               Divider(height: 0),
               _body(),
-              Divider(height: 0),
+              !_showVolumeControls && !_animatingVolumeControls
+                  ? Divider(height: 0)
+                  : SizedBox(height: 0),
               _footer(),
             ],
           ),
@@ -671,55 +712,169 @@ class _RemoteControlState extends State<RemoteControl> {
       );
     }
 
+    var theme = Theme.of(context);
+
     return Expanded(
-      child: ListView.builder(
-        itemCount: playlist.length,
-        itemBuilder: (context, index) {
-          var item = playlist[index];
-          var icon = item.icon;
-          if (item.current) {
-            switch (state) {
-              case 'stopped':
-                icon = Icons.stop;
-                break;
-              case 'paused':
-                icon = Icons.pause;
-                break;
-              case 'playing':
-                icon = Icons.play_arrow;
-                break;
-            }
-          }
-          return ListTile(
-            dense: widget.settings.dense,
-            selected: item.current,
-            leading: Icon(icon),
-            title: Text(
-              item.title,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontWeight: item.current ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-            trailing: !item.isDir ? Text(formatTime(item.duration)) : null,
-            onTap: () {
+      child: Stack(
+        children: [
+          ListView.builder(
+            itemCount: playlist.length,
+            itemBuilder: (context, index) {
+              var item = playlist[index];
+              var icon = item.icon;
               if (item.current) {
-                _pause();
-              } else {
-                _play(item);
+                switch (state) {
+                  case 'stopped':
+                    icon = Icons.stop;
+                    break;
+                  case 'paused':
+                    icon = Icons.pause;
+                    break;
+                  case 'playing':
+                    icon = Icons.play_arrow;
+                    break;
+                }
               }
+              return ListTile(
+                dense: widget.settings.dense,
+                selected: item.current,
+                leading: Icon(icon),
+                title: Text(
+                  item.title,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight:
+                        item.current ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+                trailing: !item.isDir ? Text(formatTime(item.duration)) : null,
+                onTap: () {
+                  if (item.current) {
+                    _pause();
+                  } else {
+                    _play(item);
+                  }
+                },
+                onLongPress: () {
+                  _delete(item);
+                },
+              );
             },
-            onLongPress: () {
-              _delete(item);
-            },
-          );
-        },
-        // separatorBuilder: (context, index) => Divider(height: 0),
+          ),
+          Positioned.fill(
+            child: Column(
+              children: <Widget>[
+                Spacer(),
+                TweenAnimationBuilder(
+                  tween: Tween<Offset>(
+                      begin: Offset(0, 1),
+                      end: Offset(0, _showVolumeControls ? 0 : 1)),
+                  duration: Duration(milliseconds: 250),
+                  curve: _showVolumeControls ? Curves.easeOut : Curves.easeIn,
+                  onEnd: () {
+                    setState(() {
+                      _animatingVolumeControls = false;
+                    });
+                  },
+                  builder: (context, offset, child) => SlideTransition(
+                    position: AlwaysStoppedAnimation<Offset>(offset),
+                    child: child,
+                  ),
+                  child: _buildVolumeControls(),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
+  Widget _buildVolumeControls() {
+    return Column(
+      children: <Widget>[
+        Divider(height: 0),
+        Container(
+          color: _headerFooterBgColor,
+          padding: EdgeInsets.symmetric(horizontal: 4),
+          child: Material(
+            color: Colors.transparent,
+            child: Row(
+              children: <Widget>[
+                // Volume down
+                IconButton(
+                  icon: Icon(Icons.remove),
+                  tooltip: 'Decrease volume',
+                  onPressed: _volume > 0
+                      ? () {
+                          if (!_showVolumeControls) {
+                            _showVolumeControls = true;
+                          }
+                          _volumeRelative(-25);
+                          _scheduleHidingVolumeControls(2);
+                        }
+                      : null,
+                ),
+                // Volume slider
+                Expanded(
+                  flex: 1,
+                  child: Slider(
+                    label: '${_volumeSliderValue().round()}%',
+                    divisions: 200,
+                    max: 200,
+                    value: _volumeSliderValue(),
+                    onChangeStart: (percent) {
+                      setState(() {
+                        _volumeSliding = true;
+                        if (!_showVolumeControls) {
+                          _showVolumeControls = true;
+                        }
+                      });
+                      _cancelHidingVolumeControls();
+                    },
+                    onChanged: (percent) {
+                      setState(() {
+                        _volume = _scaleVolumePercent(percent);
+                      });
+                      Throttle.milliseconds(_volumeSlidingThrottleMilliseconds,
+                          _volumePercent, [percent], {#finished: false});
+                    },
+                    onChangeEnd: (percent) {
+                      _volumePercent(percent);
+                      if (percent == 0.0) {
+                        _preMuteVolume = null;
+                      }
+                      setState(() {
+                        _volumeSliding = false;
+                      });
+                      _scheduleHidingVolumeControls(2);
+                    },
+                  ),
+                ),
+                // Volume up
+                IconButton(
+                  icon: Icon(Icons.add),
+                  tooltip: 'Increase volume',
+                  onPressed: _volume < 512
+                      ? () {
+                          if (!_showVolumeControls) {
+                            _showVolumeControls = true;
+                          }
+                          _volumeRelative(25);
+                          _scheduleHidingVolumeControls(2);
+                        }
+                      : null,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _footer() {
+    var theme = Theme.of(context);
     return Visibility(
       visible:
           widget.settings.connection.isValid && lastStatusResponseCode == 200,
@@ -727,76 +882,6 @@ class _RemoteControlState extends State<RemoteControl> {
         color: _headerFooterBgColor,
         child: Column(
           children: <Widget>[
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 14),
-              child: Row(
-                children: <Widget>[
-                  // Volume down
-                  Builder(
-                    builder: (context) => GestureDetector(
-                      onTap: () {
-                        _volumeRelative(-25);
-                      },
-                      onDoubleTap: () {
-                        if (volume > 0) {
-                          _volumePercent(0);
-                        } else {
-                          _volumePercent(100);
-                        }
-                      },
-                      child: Icon(Icons.volume_down),
-                    ),
-                  ),
-                  // Volume slider
-                  Flexible(
-                    flex: 1,
-                    child: Slider(
-                      label: '${_volumeSliderValue().round()}%',
-                      divisions: 200,
-                      max: 200,
-                      value: _volumeSliderValue(),
-                      onChangeStart: (percent) {
-                        setState(() {
-                          volumeSliding = true;
-                        });
-                      },
-                      onChanged: (percent) {
-                        setState(() {
-                          volume = _scaleVolumePercent(percent);
-                        });
-                        Throttle.milliseconds(
-                            _volumeSlidingThrottleMilliseconds,
-                            _volumePercent,
-                            [percent],
-                            {#finished: false});
-                      },
-                      onChangeEnd: (percent) {
-                        _volumePercent(percent);
-                        setState(() {
-                          volumeSliding = false;
-                        });
-                      },
-                    ),
-                  ),
-                  // Volume up
-                  Builder(
-                    builder: (context) => GestureDetector(
-                      onTap: () {
-                        _volumeRelative(25);
-                      },
-                      onDoubleTap: () {
-                        if (volume > 0) {
-                          _volumePercent(0);
-                        } else {
-                          _volumePercent(100);
-                        }
-                      },
-                      child: Icon(Icons.volume_up),
-                    ),
-                  ),
-                ],
-              ),
-            ),
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 14),
               child: Row(
@@ -810,14 +895,13 @@ class _RemoteControlState extends State<RemoteControl> {
                         state != 'stopped' ? formatTime(time) : '––:––',
                         style: TextStyle(
                           color: ticker.isActive
-                              ? Theme.of(context).textTheme.bodyText2.color
-                              : Theme.of(context).disabledColor,
+                              ? theme.textTheme.bodyText2.color
+                              : theme.disabledColor,
                         ),
                       ),
                     ),
                   ),
-                  Flexible(
-                    flex: 1,
+                  Expanded(
                     child: Slider(
                       divisions: 100,
                       max: state != 'stopped' ? 100 : 0,
@@ -856,6 +940,29 @@ class _RemoteControlState extends State<RemoteControl> {
                           : '––:––',
                     ),
                   ),
+                  SizedBox(width: 12),
+                  Builder(
+                    builder: (context) => GestureDetector(
+                      onTap: _toggleVolumeControls,
+                      onLongPress: () {
+                        if (_volume > 0) {
+                          _preMuteVolume = _volume;
+                          _volumePercent(0);
+                        } else {
+                          _volumePercent(_preMuteVolume != null
+                              ? _preMuteVolume / volumeSliderScaleFactor
+                              : 100);
+                        }
+                      },
+                      child: Icon(_volume == 0
+                          ? Icons.volume_off
+                          : _volume < 102
+                              ? Icons.volume_mute
+                              : _volume < 218
+                                  ? Icons.volume_down
+                                  : Icons.volume_up),
+                    ),
+                  )
                 ],
               ),
             ),
