@@ -587,10 +587,7 @@ class _RemoteControlState extends State<RemoteControl> {
                     dense: widget.settings.dense,
                     title: Text(
                       playing == null && title.isEmpty
-                          ? 'VLC Remote' +
-                              (lastStatusResponse != null
-                                  ? ' (${lastStatusResponse.version})'
-                                  : '')
+                          ? 'VLC Remote 1.1.3'
                           : playing?.title ??
                               cleanVideoTitle(
                                   title.split(RegExp(r'[\\/]')).last),
@@ -704,7 +701,14 @@ class _RemoteControlState extends State<RemoteControl> {
         child: Padding(
           padding: EdgeInsets.all(32),
           child: lastPlaylistResponseCode == 200
-              ? Image.asset('assets/icon-512.png')
+              ? Stack(alignment: AlignmentDirectional.center, children: [
+                  Image.asset('assets/icon-512.png'),
+                  Positioned(
+                    bottom: 0,
+                    child:
+                        Text('Connected to VLC ${lastStatusResponse.version}'),
+                  )
+                ])
               : ConnectionAnimation(),
         ),
       );
