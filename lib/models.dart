@@ -26,15 +26,12 @@ class BrowseItem {
     if (isDir) {
       return Icons.folder;
     }
-
     if (isAudio) {
       return Icons.audiotrack;
     }
-
     if (isVideo) {
       return Icons.movie;
     }
-
     return Icons.insert_drive_file;
   }
 
@@ -285,30 +282,39 @@ class VlcStatusResponse {
 }
 
 class PlaylistItem {
-  xml.XmlElement leafElement;
-  PlaylistItem(this.leafElement);
+  String id;
+  String name;
+  String uri;
+  Duration duration;
+  bool current;
 
-  String get name {
-    return leafElement.getAttribute('name');
+  PlaylistItem.fromXmlElement(xml.XmlElement el)
+      : name = el.getAttribute('name'),
+        id = el.getAttribute('id'),
+        duration = Duration(seconds: int.tryParse(el.getAttribute('duration'))),
+        uri = el.getAttribute('uri'),
+        current = el.getAttribute('current') != null;
+
+  IconData get icon {
+    if (isDir) {
+      return Icons.folder;
+    }
+    if (isAudio) {
+      return Icons.audiotrack;
+    }
+    if (isVideo) {
+      return Icons.movie;
+    }
+    return Icons.insert_drive_file;
   }
 
-  String get id {
-    return leafElement.getAttribute('id');
-  }
+  bool get isAudio => _audioExtensions.hasMatch(uri);
 
-  Duration get duration {
-    return Duration(
-        seconds: int.tryParse(leafElement.getAttribute('duration')));
-  }
+  bool get isDir => uri.startsWith('directory:');
 
-  String get uri {
-    return leafElement.getAttribute('uri');
-  }
+  bool get isFile => uri.startsWith('file:');
 
-  bool get current {
-    var attribute = leafElement.getAttribute('current');
-    return attribute == null ? false : attribute.isNotEmpty;
-  }
+  bool get isVideo => _videoExtensions.hasMatch(uri);
 
   String get title => cleanTitle(name, keepExt: false);
 
@@ -339,7 +345,7 @@ class PlaylistNode {
   List<PlaylistItem> get playlistItems {
     return nodeElement
         .findElements('leaf')
-        .map((el) => PlaylistItem(el))
+        .map((el) => PlaylistItem.fromXmlElement(el))
         .toList();
   }
 
@@ -361,7 +367,7 @@ class VlcPlaylistResponse {
   List<PlaylistItem> get playListItems {
     var items = document.rootElement
         .findAllElements('leaf')
-        .map((el) => PlaylistItem(el))
+        .map((el) => PlaylistItem.fromXmlElement(el))
         .toList();
     currentItem = items.isEmpty
         ? null
