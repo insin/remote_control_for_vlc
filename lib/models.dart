@@ -342,64 +342,24 @@ class PlaylistItem {
   }
 }
 
-class PlaylistNode {
-  xml.XmlElement nodeElement;
-  PlaylistNode(this.nodeElement);
-
-  String get name {
-    return nodeElement.getAttribute('name');
-  }
-
-  String get id {
-    return nodeElement.getAttribute('id');
-  }
-
-  List<PlaylistItem> get playlistItems {
-    return nodeElement
-        .findElements('leaf')
-        .map((el) => PlaylistItem.fromXmlElement(el))
-        .toList();
-  }
-
-  String toString() {
-    return 'PlaylistNode(${{
-      'name': name,
-      'id': id,
-      'playlistItems': playlistItems
-    }})';
-  }
-}
-
 class VlcPlaylistResponse {
-  xml.XmlDocument document;
-  VlcPlaylistResponse(this.document);
-
+  List<PlaylistItem> items;
   PlaylistItem currentItem;
 
-  List<PlaylistItem> get playListItems {
-    var items = document.rootElement
-        .findAllElements('leaf')
-        .map((el) => PlaylistItem.fromXmlElement(el))
-        .toList();
-    currentItem = items.isEmpty
-        ? null
-        : items.firstWhere((item) {
-            return item.current ?? false;
-          }, orElse: () => null);
-    return items;
-  }
-
-  List<PlaylistNode> get playlistNodes {
-    return document.rootElement
-        .findElements('node')
-        .map((el) => PlaylistNode(el))
-        .toList();
+  VlcPlaylistResponse.fromXmlDocument(xml.XmlDocument doc)
+      : items = doc.rootElement
+            .findElements('node')
+            .first
+            .findAllElements('leaf')
+            .map((el) => PlaylistItem.fromXmlElement(el))
+            .toList() {
+    currentItem =
+        items.firstWhere((item) => item.current ?? false, orElse: () => null);
   }
 
   String toString() {
     return 'VlcPlaylistResponse(${{
-      'playlistNodes': playlistNodes,
-      'playListItems': playListItems,
+      'items': items,
       'currentItem': currentItem
     }})';
   }

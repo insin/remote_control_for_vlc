@@ -150,13 +150,13 @@ class _RemoteControlState extends State<RemoteControl> {
     if (document == null) {
       return null;
     }
-    var playlistResponse = VlcPlaylistResponse(document);
+    var playlistResponse = VlcPlaylistResponse.fromXmlDocument(document);
     assert(() {
       //print(playlistResponse);
       return true;
     }());
     setState(() {
-      playlist = playlistResponse.playListItems;
+      playlist = playlistResponse.items;
       playing = playlistResponse.currentItem;
       lastPlaylistResponse = lastPlaylistResponse;
     });
@@ -240,7 +240,7 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _tick(timer) async {
-    _updateStateAndPlaylist();
+    _updateStatusAndPlaylist();
   }
 
   _scheduleSingleUpdate() async {
@@ -255,7 +255,7 @@ class _RemoteControlState extends State<RemoteControl> {
     }
 
     delayedTimer =
-        Timer(Duration(seconds: _tickIntervalSecs), _updateStateAndPlaylist);
+        Timer(Duration(seconds: _tickIntervalSecs), _updateStatusAndPlaylist);
   }
 
   _resetPlaylist() {
@@ -264,7 +264,7 @@ class _RemoteControlState extends State<RemoteControl> {
     title = '';
   }
 
-  _updateStateAndPlaylist() {
+  _updateStatusAndPlaylist() {
     if (widget.settings.connection.isNotValid) {
       _resetPlaylist();
       return;
