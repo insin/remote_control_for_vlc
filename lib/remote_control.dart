@@ -285,7 +285,6 @@ class _RemoteControlState extends State<RemoteControl> {
       ),
     );
 
-
     if (result == null) {
       return;
     }
@@ -582,7 +581,7 @@ class _RemoteControlState extends State<RemoteControl> {
                     dense: widget.settings.dense,
                     title: Text(
                       playing == null && title.isEmpty
-                          ? 'VLC Remote 1.1.3'
+                          ? 'VLC Remote 1.2.0'
                           : playing?.title ??
                               cleanVideoTitle(
                                   title.split(RegExp(r'[\\/]')).last),
