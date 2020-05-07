@@ -278,25 +278,21 @@ class _RemoteControlState extends State<RemoteControl> {
     BrowseResult result = await Navigator.push(
       context,
       MaterialPageRoute(
-          builder: (context) => OpenMedia(
-                prefs: widget.prefs,
-                settings: widget.settings,
-              )),
+        builder: (context) => OpenMedia(
+          prefs: widget.prefs,
+          settings: widget.settings,
+        ),
+      ),
     );
 
-    if (result != null) {
-      var response = await _statusRequest({
-        'command': 'in_play',
-        'input': result.item.uri,
-      });
-      if (response == null) {
-        return;
-      }
-      assert(() {
-        print('Playing ${result.item}');
-        return true;
-      }());
+    if (result == null) {
+      return;
     }
+
+    _statusRequest({
+      'command': 'in_play',
+      'input': result.item.uri,
+    });
   }
 
   _enqueueMedia() async {
@@ -309,20 +305,15 @@ class _RemoteControlState extends State<RemoteControl> {
               )),
     );
 
-    if (result != null) {
-      var response = await _statusRequest({
-        'command': 'in_enqueue',
-        'input': result.item.uri,
-      });
-      _scheduleSingleUpdate();
-      if (response == null) {
-        return;
-      }
-      assert(() {
-        print('Enqueued ${result.item}');
-        return true;
-      }());
+    if (result == null) {
+      return;
     }
+
+    _statusRequest({
+      'command': 'in_enqueue',
+      'input': result.item.uri,
+    });
+    _scheduleSingleUpdate();
   }
 
   _play(PlaylistItem item) {
@@ -718,8 +709,6 @@ class _RemoteControlState extends State<RemoteControl> {
         ),
       );
     }
-
-    var theme = Theme.of(context);
 
     return Expanded(
       child: Stack(
