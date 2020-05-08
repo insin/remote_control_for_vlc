@@ -981,6 +981,7 @@ class _RemoteControlState extends State<RemoteControl> {
                     onTap: _previous,
                   ),
                   Expanded(child: VerticalDivider()),
+                  // Rewind button
                   GestureDetector(
                     child: Icon(
                       Icons.fast_rewind,
@@ -990,17 +991,28 @@ class _RemoteControlState extends State<RemoteControl> {
                       _seekRelative(-5);
                     },
                   ),
+                  // Play/pause button
                   Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 10),
-                      child: GestureDetector(
-                        onTap: _pause,
-                        child: Icon(
-                          state == 'paused' || state == 'stopped'
-                              ? Icons.play_arrow
-                              : Icons.pause,
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: GestureDetector(
+                      onTap: _pause,
+                      child: TweenAnimationBuilder(
+                        tween: Tween<double>(
+                            begin: 0.0,
+                            end: state == 'paused' || state == 'stopped'
+                                ? 0.0
+                                : 1.0),
+                        duration: Duration(milliseconds: 250),
+                        curve: Curves.easeInOut,
+                        builder: (context, progress, child) => AnimatedIcon(
                           size: 42,
+                          icon: AnimatedIcons.play_pause,
+                          progress: AlwaysStoppedAnimation<double>(progress),
                         ),
-                      )),
+                      ),
+                    ),
+                  ),
+                  // Fast forward
                   GestureDetector(
                     child: Icon(
                       Icons.fast_forward,
