@@ -741,7 +741,9 @@ class _RemoteControlState extends State<RemoteControl> {
                         item.current ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
-                trailing: item.isMedia ? Text(formatTime(item.duration)) : null,
+                trailing: !item.duration.isNegative
+                    ? Text(formatTime(item.duration))
+                    : null,
                 onTap: () {
                   if (item.current) {
                     _pause();

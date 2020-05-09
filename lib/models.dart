@@ -22,6 +22,10 @@ class BrowseItem {
     this.uri,
   );
 
+  BrowseItem.fromUrl(String url)
+      : uri = url.startsWith(urlRegExp) ? url : 'https://$url',
+        type = 'web';
+
   /// Sending a directory: url when enqueueing makes a directory display as directory in the VLC
   /// playlist instead of as a generic file.
   String get playlistUri {
@@ -32,6 +36,9 @@ class BrowseItem {
   IconData get icon {
     if (isDir) {
       return Icons.folder;
+    }
+    if (isWeb) {
+      return Icons.public;
     }
     if (isAudio) {
       return Icons.audiotrack;
@@ -48,9 +55,11 @@ class BrowseItem {
 
   bool get isFile => type == 'file';
 
+  bool get isSupportedMedia => isAudio || isVideo || isWeb;
+
   bool get isVideo => _videoExtensions.hasMatch(path);
 
-  bool get isSupportedMedia => isAudio || isVideo;
+  bool get isWeb => type == 'web';
 
   String get title => isVideo ? cleanVideoTitle(name, keepExt: isFile) : name;
 
@@ -309,6 +318,9 @@ class PlaylistItem {
     if (isDir) {
       return Icons.folder;
     }
+    if (isWeb) {
+      return Icons.public;
+    }
     if (isAudio) {
       return Icons.audiotrack;
     }
@@ -327,6 +339,8 @@ class PlaylistItem {
   bool get isMedia => isAudio || isVideo;
 
   bool get isVideo => _videoExtensions.hasMatch(uri);
+
+  bool get isWeb => uri.startsWith('http');
 
   String get title => isVideo ? cleanVideoTitle(name, keepExt: false) : name;
 

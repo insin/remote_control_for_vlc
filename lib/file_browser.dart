@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart' as xml;
 
 import 'models.dart';
+import 'widgets.dart';
 
 class FileBrowser extends StatefulWidget {
   final BrowseItem dir;
@@ -105,10 +106,6 @@ class _FileBrowserState extends State<FileBrowser> {
     });
   }
 
-  _handleTapDown(details) {
-    _tapPosition = details.globalPosition;
-  }
-
   _handleTap(BrowseItem item) async {
     if (item.isDir) {
       BrowseResult result = await Navigator.push(
@@ -128,14 +125,6 @@ class _FileBrowserState extends State<FileBrowser> {
     } else {
       Navigator.pop(context, BrowseResult(item, BrowseResultIntent.play));
     }
-  }
-
-  _handleLongPress(item) async {
-    var intent = await _showMenu();
-    if (intent == null) {
-      return null;
-    }
-    Navigator.pop(context, BrowseResult(item, intent));
   }
 
   @override
@@ -160,27 +149,6 @@ class _FileBrowserState extends State<FileBrowser> {
             : null,
       ),
       body: _renderList(),
-    );
-  }
-
-  Offset _tapPosition;
-
-  Future<BrowseResultIntent> _showMenu() async {
-    final RenderBox overlay = Overlay.of(context).context.findRenderObject();
-    return await showMenu(
-      context: context,
-      items: <PopupMenuItem<BrowseResultIntent>>[
-        PopupMenuItem(
-          child: Text('Play'),
-          value: BrowseResultIntent.play,
-        ),
-        PopupMenuItem(
-          child: Text('Enqueue'),
-          value: BrowseResultIntent.enqueue,
-        ),
-      ],
-      position: RelativeRect.fromRect(
-          _tapPosition & Size(40, 40), Offset.zero & overlay.size),
     );
   }
 
@@ -226,11 +194,8 @@ class _FileBrowserState extends State<FileBrowser> {
       itemCount: _items.length,
       itemBuilder: (context, i) {
         var item = _items[i];
-        return GestureDetector(
-          onTapDown: _handleTapDown,
-          onLongPress: () {
-            _handleLongPress(item);
-          },
+        return EnqueueMenuGestureDetector(
+          item: item,
           child: ListTile(
             dense: widget.settings.dense,
             leading: Icon(item.icon),

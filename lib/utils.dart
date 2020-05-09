@@ -145,6 +145,9 @@ String formatTime(Duration duration) {
   return '${duration.inHours >= 1 ? duration.inHours.toString() + ':' : ''}$minutes:$seconds';
 }
 
+/// Matches some of the protocols supported by VLC.
+var urlRegExp = RegExp(r'((f|ht)tps?|mms|rts?p)://');
+
 /*
  * Trick stolen from https://gist.github.com/shubhamjain/9809108#file-vlc_http-L108
  * The interface expects value between 0 and 512 while in the UI it is 0% to 200%.
