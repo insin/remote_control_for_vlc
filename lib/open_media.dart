@@ -12,6 +12,7 @@ import 'widgets.dart';
 var fileSystemItem = BrowseItem('dir', 'File System', '', 'file:///');
 
 /// Allow some commonly-used media URLs without protocols to pass for Copied URL
+/// See https://github.com/videolan/vlc/tree/master/share/lua/playlist
 var probablyMediaUrlRegExp = RegExp([
   r'(www\.)?dailymotion\.com/video/',
   r'(www\.)?soundcloud\.com/.+/.+',
