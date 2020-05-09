@@ -19,6 +19,8 @@ var probablyMediaUrlRegExp = RegExp([
   r'(www\.)?vimeo\.com/(channels/.+/)?\d+|player\.vimeo\.com/',
 ].join('|'));
 
+var wwwRegexp = RegExp(r'www\.');
+
 class OpenMedia extends StatefulWidget {
   final SharedPreferences prefs;
   final Settings settings;
@@ -72,6 +74,10 @@ class _OpenMediaState extends State<OpenMedia> with WidgetsBindingObserver {
       _clipboardUrlItem = urlItem;
     });
   }
+
+  String get _displayUrl => _clipboardUrlItem.uri
+      .replaceFirst(urlRegExp, '')
+      .replaceFirst(wwwRegexp, '');
 
   _handleOtherUrl(intent) {
     if (_otherUrl == null || _otherUrl.isEmpty) {
@@ -130,7 +136,7 @@ class _OpenMediaState extends State<OpenMedia> with WidgetsBindingObserver {
           child: ListTile(
             dense: widget.settings.dense,
             title: Text('Copied URL'),
-            subtitle: Text(_clipboardUrlItem.uri),
+            subtitle: Text(_displayUrl),
             leading: Icon(Icons.public),
             onTap: () {
               Navigator.pop(context,
