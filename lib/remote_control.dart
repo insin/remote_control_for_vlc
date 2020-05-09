@@ -116,7 +116,9 @@ class _RemoteControlState extends State<RemoteControl> {
       if (!ignoreStateUpdates) {
         state = statusResponse.state;
       }
-      length = statusResponse.length;
+      length = statusResponse.length.isNegative
+          ? Duration.zero
+          : statusResponse.length;
       if (!ignoreVolumeUpdates && statusResponse.volume != null) {
         _volume = statusResponse.volume.clamp(0, 512);
       }
