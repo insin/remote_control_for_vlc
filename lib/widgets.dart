@@ -21,14 +21,6 @@ class _EnqueueMenuGestureDetectorState
     _tapPosition = details.globalPosition;
   }
 
-  _handleLongPress(item) async {
-    var intent = await _showMenu();
-    if (intent == null) {
-      return null;
-    }
-    Navigator.pop(context, BrowseResult(item, intent));
-  }
-
   _showMenu() async {
     final RenderBox overlay = Overlay.of(context).context.findRenderObject();
     var intent = await showMenu(
