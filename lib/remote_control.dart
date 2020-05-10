@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui';
 
 import 'package:connectivity/connectivity.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:just_throttle_it/just_throttle_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:transparent_image/transparent_image.dart';
 import 'package:xml/xml.dart' as xml;
 
 import 'models.dart';
@@ -566,7 +568,7 @@ class _RemoteControlState extends State<RemoteControl> {
 
   _play(PlaylistItem item) {
     // Preempt setting active playlist item
-    if (_playing != item && item.isMediaFile) {
+    if (_playing != item && item.isMedia) {
       _playing = item;
     }
     _statusRequest({
@@ -751,6 +753,36 @@ class _RemoteControlState extends State<RemoteControl> {
     return Expanded(
       child: Stack(
         children: [
+          if (widget.settings.blurredCoverBg &&
+              _playing != null &&
+              _playing.isAudio)
+            Positioned.fill(
+              child: Opacity(
+                opacity: .2,
+                child: ClipRect(
+                  child: ImageFiltered(
+                    imageFilter: ImageFilter.blur(
+                      sigmaX: 2,
+                      sigmaY: 2,
+                    ),
+                    child: FadeInImage(
+                      imageErrorBuilder: (context, error, stackTrace) =>
+                          SizedBox(),
+                      placeholder: MemoryImage(kTransparentImage),
+                      image: NetworkImage(
+                        'http://${widget.settings.connection.authority}/art?item=${_playing.id}',
+                        headers: {
+                          'Authorization': 'Basic ' +
+                              base64Encode(utf8.encode(
+                                  ':${widget.settings.connection.password}')),
+                        },
+                      ),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ListView.builder(
             itemCount: _playlist.length,
             itemBuilder: (context, index) {

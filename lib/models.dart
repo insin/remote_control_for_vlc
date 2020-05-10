@@ -169,19 +169,22 @@ class Connection {
 class Settings {
   SharedPreferences _prefs;
 
+  bool blurredCoverBg;
   bool dense;
   Connection connection;
 
   Settings(this._prefs) {
     Map<String, dynamic> json =
         jsonDecode(_prefs.getString('settings') ?? '{}');
-    dense = json['dense'] ?? false;
+    blurredCoverBg = json['blurredCoverBg'] ?? true;
     connection = Connection.fromJson(json['connection'] ?? {});
+    dense = json['dense'] ?? false;
   }
 
   Map<String, dynamic> toJson() => {
-        'dense': dense,
+        'blurredCoverBg': blurredCoverBg,
         'connection': connection,
+        'dense': dense,
       };
 
   save() {
@@ -336,7 +339,7 @@ class PlaylistItem {
 
   bool get isFile => uri.startsWith('file:');
 
-  bool get isMediaFile => isAudio || isVideo;
+  bool get isMedia => isAudio || isVideo || isWeb;
 
   bool get isVideo => _videoExtensions.hasMatch(uri);
 

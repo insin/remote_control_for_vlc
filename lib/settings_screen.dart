@@ -312,6 +312,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             });
           },
         ),
+        CheckboxListTile(
+          title: Text('Blurred cover background'),
+          subtitle: Text('When available for audio files'),
+          value: widget.settings.blurredCoverBg,
+          dense: widget.settings.dense,
+          onChanged: (dense) {
+            setState(() {
+              widget.settings.blurredCoverBg = dense;
+              widget.onSettingsChanged();
+            });
+          },
+        ),
       ]),
     );
   }

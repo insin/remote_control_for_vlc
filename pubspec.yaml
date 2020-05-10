@@ -17,6 +17,7 @@ dependencies:
   http: ^0.12.1
   just_throttle_it: ^1.0.0
   shared_preferences: ^0.5.7
+  transparent_image: ^1.0.0
   xml: ^3.5.0
 
 dev_dependencies:
