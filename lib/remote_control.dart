@@ -750,8 +750,8 @@ class _RemoteControlState extends State<RemoteControl> {
                   Image.asset('assets/icon-512.png'),
                   Positioned(
                     bottom: 0,
-                    child:
-                        Text('Connected to VLC ${lastStatusResponse.version}'),
+                    child: Text(
+                        'Connected to VLC ${_lastStatusResponse?.version ?? ''}'),
                   )
                 ])
               : ConnectionAnimation(),
