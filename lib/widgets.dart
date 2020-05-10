@@ -52,3 +52,11 @@ class _EnqueueMenuGestureDetectorState
     );
   }
 }
+
+/// Remove current focus to hide the keyboard.
+removeCurrentFocus(BuildContext context) {
+  FocusScopeNode currentFocus = FocusScope.of(context);
+  if (!currentFocus.hasPrimaryFocus) {
+    currentFocus.unfocus();
+  }
+}

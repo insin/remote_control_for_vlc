@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import 'models.dart';
+import 'widgets.dart';
 
 class SettingsScreen extends StatefulWidget {
   final Settings settings;
@@ -113,6 +114,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   _testConnection() async {
+    removeCurrentFocus(context);
     if (!connection.isValid) {
       setState(() {
         ipDirty = true;
