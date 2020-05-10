@@ -62,6 +62,7 @@ class _RemoteControlState extends State<RemoteControl> {
   // Fields populated from the latest VLC status response
   String _state = 'stopped';
   String _title = '';
+  String _artist = '';
   Duration _time = Duration.zero;
   Duration _length = Duration.zero;
   int _volume = 256;
@@ -223,6 +224,7 @@ class _RemoteControlState extends State<RemoteControl> {
         _volume = statusResponse.volume.clamp(0, 512);
       }
       _title = statusResponse.title;
+      _artist = statusResponse.artist;
       if (!_draggingTime) {
         var responseTime = statusResponse.time;
         // VLC will let time go over and under length using relative seek times
@@ -813,6 +815,8 @@ class _RemoteControlState extends State<RemoteControl> {
                         item.current ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
+                subtitle:
+                    item.current && _artist.isNotEmpty ? Text(_artist) : null,
                 trailing: !item.duration.isNegative
                     ? Text(formatTime(item.duration))
                     : null,

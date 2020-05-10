@@ -207,6 +207,7 @@ class VlcStatusResponse {
   xml.XmlDocument document;
   List<LanguageTrack> _audioTracks;
   List<LanguageTrack> _subtitleTracks;
+  Map<String, String> _info;
 
   VlcStatusResponse(this.document);
 
@@ -220,15 +221,28 @@ class VlcStatusResponse {
 
   int get volume => int.tryParse(document.findAllElements('volume').first.text);
 
-  String get title {
-    Map<String, String> titles = Map.fromIterable(
-      document.findAllElements('info').where(
-          (el) => ['title', 'filename'].contains(el.getAttribute('name'))),
-      key: (el) => el.getAttribute('name'),
-      value: (el) => el.text,
-    );
-    return titles['title'] ?? titles['filename'] ?? '';
+  Map<String, String> get _metadata {
+    if (this._info != null) {
+      return _info;
+    }
+    var category = document.rootElement
+        .findElements('information')
+        .first
+        ?.findElements('category')
+        ?.first;
+    _info = category != null
+        ? Map.fromIterable(
+            category.findElements('info'),
+            key: (el) => el.getAttribute('name'),
+            value: (el) => el.text,
+          )
+        : {};
+    return _info;
   }
+
+  String get title => _metadata['title'] ?? _metadata['filename'] ?? '';
+
+  String get artist => _metadata['artist'] ?? '';
 
   bool get fullscreen =>
       document.findAllElements('fullscreen').first.text == 'true';
