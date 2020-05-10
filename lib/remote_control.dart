@@ -616,125 +616,114 @@ class _RemoteControlState extends State<RemoteControl> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Container(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              Container(
-                color: _headerFooterBgColor,
-                child: Material(
-                  color: Colors.transparent,
-                  child: ListTile(
-                    contentPadding: EdgeInsets.only(left: 14),
-                    dense: widget.settings.dense,
-                    title: Text(
-                      _playing == null && _title.isEmpty
-                          ? 'VLC Remote 1.2.0'
-                          : _playing?.title ??
-                              cleanVideoTitle(
-                                  _title.split(RegExp(r'[\\/]')).last),
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontWeight: FontWeight.bold),
+        child: Column(
+          children: <Widget>[
+            Material(
+              color: _headerFooterBgColor,
+              child: ListTile(
+                contentPadding: EdgeInsets.only(left: 14),
+                dense: widget.settings.dense,
+                title: Text(
+                  _playing == null && _title.isEmpty
+                      ? 'VLC Remote 1.2.0'
+                      : _playing?.title ??
+                          cleanVideoTitle(_title.split(RegExp(r'[\\/]')).last),
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Visibility(
+                      visible:
+                          _pollingTicker == null || !_pollingTicker.isActive,
+                      child: IconButton(
+                        icon: Icon(Icons.refresh),
+                        onPressed: _updateStatusAndPlaylist,
+                        tooltip: 'Refresh VLC status',
+                      ),
                     ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Visibility(
-                          visible: _pollingTicker != null
-                              ? !_pollingTicker.isActive
-                              : true,
-                          child: IconButton(
-                            icon: Icon(Icons.refresh),
-                            onPressed: _updateStatusAndPlaylist,
-                            tooltip: 'Refresh VLC status',
+                    IconButton(
+                      icon: Icon(Icons.settings),
+                      tooltip: 'Show settings',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => SettingsScreen(
+                              settings: widget.settings,
+                              onSettingsChanged: () {
+                                setState(() {
+                                  widget.settings.save();
+                                });
+                              },
+                            ),
                           ),
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.settings),
-                          tooltip: 'Show settings',
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => SettingsScreen(
-                                  settings: widget.settings,
-                                  onSettingsChanged: () {
-                                    setState(() {
-                                      widget.settings.save();
-                                    });
-                                  },
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                        Visibility(
-                          visible: _lastStatusResponseCode == 200,
-                          child: PopupMenuButton<_PopupMenuChoice>(
-                            onSelected: _onPopupMenuChoice,
-                            itemBuilder: (context) {
-                              return [
-                                PopupMenuItem(
-                                  child: Text('Select subtitle track'),
-                                  value: _PopupMenuChoice.SUBTITLE_TRACK,
-                                  enabled:
-                                      (_lastStatusResponse?.subtitleTracks ??
-                                              [])
-                                          .isNotEmpty,
-                                ),
-                                PopupMenuItem(
-                                  child: Text('Select audio track'),
-                                  value: _PopupMenuChoice.AUDIO_TRACK,
-                                  enabled:
-                                      (_lastStatusResponse?.audioTracks ?? [])
-                                          .isNotEmpty,
-                                ),
-                                PopupMenuItem(
-                                  child: Text('Turn fullscreen '
-                                      '${_lastStatusResponse.fullscreen ? 'OFF' : 'ON'}'),
-                                  value: _PopupMenuChoice.FULLSCREEN,
-                                  enabled: _lastStatusResponse != null,
-                                ),
-                                PopupMenuItem(
-                                  child: Text('Turn random play '
-                                      '${_lastStatusResponse.random ? 'OFF' : 'ON'}'),
-                                  value: _PopupMenuChoice.RANDOM_PLAY,
-                                  enabled: _lastStatusResponse != null,
-                                ),
-                                PopupMenuItem(
-                                  child: Text('Turn repeat '
-                                      '${_lastStatusResponse.repeat ? 'OFF' : 'ON'}'),
-                                  value: _PopupMenuChoice.REPEAT,
-                                  enabled: _lastStatusResponse != null,
-                                ),
-                                PopupMenuItem(
-                                  child: Text('Turn looping '
-                                      '${_lastStatusResponse.loop ? 'OFF' : 'ON'}'),
-                                  value: _PopupMenuChoice.LOOP,
-                                  enabled: _lastStatusResponse != null,
-                                ),
-                                PopupMenuItem(
-                                  child: Text('Clear playlist'),
-                                  value: _PopupMenuChoice.EMPTY_PLAYLIST,
-                                  enabled: _lastStatusResponse != null,
-                                ),
-                              ];
-                            },
-                          ),
-                        )
-                      ],
+                        );
+                      },
                     ),
-                  ),
+                    Visibility(
+                      visible: _lastStatusResponseCode == 200,
+                      child: PopupMenuButton<_PopupMenuChoice>(
+                        onSelected: _onPopupMenuChoice,
+                        itemBuilder: (context) {
+                          return [
+                            PopupMenuItem(
+                              child: Text('Select subtitle track'),
+                              value: _PopupMenuChoice.SUBTITLE_TRACK,
+                              enabled:
+                                  (_lastStatusResponse?.subtitleTracks ?? [])
+                                      .isNotEmpty,
+                            ),
+                            PopupMenuItem(
+                              child: Text('Select audio track'),
+                              value: _PopupMenuChoice.AUDIO_TRACK,
+                              enabled: (_lastStatusResponse?.audioTracks ?? [])
+                                  .isNotEmpty,
+                            ),
+                            PopupMenuItem(
+                              child: Text('Turn fullscreen '
+                                  '${_lastStatusResponse.fullscreen ? 'OFF' : 'ON'}'),
+                              value: _PopupMenuChoice.FULLSCREEN,
+                              enabled: _lastStatusResponse != null,
+                            ),
+                            PopupMenuItem(
+                              child: Text('Turn random play '
+                                  '${_lastStatusResponse.random ? 'OFF' : 'ON'}'),
+                              value: _PopupMenuChoice.RANDOM_PLAY,
+                              enabled: _lastStatusResponse != null,
+                            ),
+                            PopupMenuItem(
+                              child: Text('Turn repeat '
+                                  '${_lastStatusResponse.repeat ? 'OFF' : 'ON'}'),
+                              value: _PopupMenuChoice.REPEAT,
+                              enabled: _lastStatusResponse != null,
+                            ),
+                            PopupMenuItem(
+                              child: Text('Turn looping '
+                                  '${_lastStatusResponse.loop ? 'OFF' : 'ON'}'),
+                              value: _PopupMenuChoice.LOOP,
+                              enabled: _lastStatusResponse != null,
+                            ),
+                            PopupMenuItem(
+                              child: Text('Clear playlist'),
+                              value: _PopupMenuChoice.EMPTY_PLAYLIST,
+                              enabled: _lastStatusResponse != null,
+                            ),
+                          ];
+                        },
+                      ),
+                    )
+                  ],
                 ),
               ),
+            ),
+            Divider(height: 0),
+            _buildPlaylist(),
+            if (!_showVolumeControls && !_animatingVolumeControls)
               Divider(height: 0),
-              _buildPlaylist(),
-              !_showVolumeControls && !_animatingVolumeControls
-                  ? Divider(height: 0)
-                  : SizedBox(height: 0),
-              _buildFooter(),
-            ],
-          ),
+            _buildFooter(),
+          ],
         ),
       ),
     );
