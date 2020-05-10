@@ -183,6 +183,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final headingStyle = theme.textTheme.subtitle1
+        .copyWith(fontWeight: FontWeight.bold, color: theme.primaryColor);
     return Scaffold(
       appBar: AppBar(
         title: Text('Settings'),
@@ -192,7 +195,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           dense: widget.settings.dense,
           title: Text(
             'VLC connection',
-            style: Theme.of(context).textTheme.subtitle1,
+            style: headingStyle,
           ),
         ),
         ListTile(
@@ -252,7 +255,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ListTile(
           dense: widget.settings.dense,
           title: RaisedButton(
-            color: Theme.of(context).buttonTheme.colorScheme.primary,
+            color: theme.buttonTheme.colorScheme.primary,
             // XXX Hardcoding as theme colouring doesn't seem to be working
             textColor: Colors.white,
             onPressed: !testingConnection ? _testConnection : null,
@@ -295,10 +298,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           dense: widget.settings.dense,
           title: Text(
             'Display options',
-            style: Theme.of(context).textTheme.subtitle1,
+            style: headingStyle,
           ),
         ),
-        SwitchListTile(
+        CheckboxListTile(
           title: Text('Compact display'),
           value: widget.settings.dense,
           dense: widget.settings.dense,
