@@ -47,6 +47,7 @@ class _RemoteControlState extends State<RemoteControl> {
   http.Client _client = http.Client();
   int _lastStatusResponseCode;
   int _lastPlaylistResponseCode;
+  String _lastPlaylistResponseBody;
 
   /// Timer which controls polling status and playlist info from VLC.
   Timer _pollingTicker;
@@ -148,56 +149,87 @@ class _RemoteControlState extends State<RemoteControl> {
   //#endregion
 
   //#region HTTP requests
-  Future<xml.XmlDocument> _serverRequest(String requestType,
+  get _authHeaders => {
+        'Authorization': 'Basic ' +
+            base64Encode(utf8.encode(':${widget.settings.connection.password}'))
+      };
+
+  get _playingArtUrl =>
+      'http://${widget.settings.connection.authority}/art?item=${_playing.id}';
+
+  /// Send a request to the named VLC API [endpoint] with any [queryParameters]
+  /// given and return parsed response XML if successful.
+  ///
+  /// For the playlist endpoint, the response will be ignored if it's exactly
+  /// the same as the last playlist response we received.
+  Future<xml.XmlDocument> _serverRequest(String endpoint,
       [Map<String, String> queryParameters]) async {
     http.Response response;
     try {
-      response = await _client.get(
-        Uri.http(
-          widget.settings.connection.authority,
-          '/requests/$requestType.xml',
-          queryParameters,
-        ),
-        headers: {
-          'Authorization': 'Basic ' +
-              base64Encode(
-                  utf8.encode(':${widget.settings.connection.password}')),
-        },
-      ).timeout(Duration(seconds: 1));
+      response = await _client
+          .get(
+            Uri.http(
+              widget.settings.connection.authority,
+              '/requests/$endpoint.xml',
+              queryParameters,
+            ),
+            headers: _authHeaders,
+          )
+          .timeout(Duration(seconds: 1));
     } catch (e) {
-      _resetPlaylist();
       assert(() {
-        print('Error: $e');
+        print('_serverRequest error: $e');
         return true;
       }());
+      _resetPlaylist();
+      setState(() {
+        if (endpoint == 'status') {
+          _lastStatusResponseCode = -1;
+        } else if (endpoint == 'playlist') {
+          _lastPlaylistResponseCode = -1;
+          _lastPlaylistResponseBody = null;
+        }
+      });
+      return null;
     }
+
     setState(() {
-      if (requestType == 'status') {
-        _lastStatusResponseCode = response?.statusCode ?? -1;
-      } else if (requestType == 'playlist') {
-        _lastPlaylistResponseCode = response?.statusCode ?? -1;
+      if (endpoint == 'status') {
+        _lastStatusResponseCode = response.statusCode;
+      } else if (endpoint == 'playlist') {
+        _lastPlaylistResponseCode = response.statusCode;
       }
     });
-    if (response?.statusCode == 200) {
-      return xml.parse(utf8.decode(response.bodyBytes));
+
+    if (response.statusCode != 200) {
+      if (endpoint == 'playlist') {
+        _lastPlaylistResponseBody = null;
+      }
+      return null;
     }
-    return null;
+
+    var responseBody = utf8.decode(response.bodyBytes);
+    if (endpoint == 'playlist') {
+      if (responseBody == _lastPlaylistResponseBody) {
+        return null;
+      }
+      _lastPlaylistResponseBody = responseBody;
+    }
+    return xml.parse(responseBody);
   }
 
-  Future<VlcStatusResponse> _statusRequest(
-      [Map<String, String> queryParameters]) async {
-    assert(() {
-      print('VlcStatusRequest(${queryParameters ?? {}})');
-      return true;
-    }());
+  /// Send a request to VLC's status API endpoint - this is used to submit
+  /// commands as well as getting the current state of VLC.
+  _statusRequest([Map<String, String> queryParameters]) async {
     var requestTime = DateTime.now();
     xml.XmlDocument document = await _serverRequest('status', queryParameters);
     if (document == null) {
-      return null;
+      return;
     }
+
     var statusResponse = VlcStatusResponse(document);
     assert(() {
-      print('${queryParameters ?? {}} response: $statusResponse');
+      print('VlcStatusRequest(${queryParameters ?? {}}) => $statusResponse');
       return true;
     }());
 
@@ -207,8 +239,8 @@ class _RemoteControlState extends State<RemoteControl> {
             queryParameters['command'] == 'pl_pause' ||
             queryParameters['command'] == 'pl_stop');
 
+    // Volume changes aren't reflected in 'volume' command responses
     var ignoreVolumeUpdates = _draggingVolume ||
-        // Volume changes aren't reflected in 'volume' command responses
         queryParameters != null && queryParameters['command'] == 'volume' ||
         _ignoreVolumeUpdatesBefore != null &&
             requestTime.isBefore(_ignoreVolumeUpdatesBefore);
@@ -240,29 +272,22 @@ class _RemoteControlState extends State<RemoteControl> {
       }
       _lastStatusResponse = statusResponse;
     });
-
-    return statusResponse;
   }
 
-  Future<VlcPlaylistResponse> _playlistRequest() async {
-    assert(() {
-      //print('VlcPlaylistRequest()');
-      return true;
-    }());
+  /// Sends a request to VLC's playlist API endpoint to get the current playlist
+  /// (which also indicates the currently playing item).
+  _playlistRequest() async {
     xml.XmlDocument document = await _serverRequest('playlist', null);
+
     if (document == null) {
-      return null;
+      return;
     }
+
     var playlistResponse = VlcPlaylistResponse.fromXmlDocument(document);
-    assert(() {
-      //print(playlistResponse);
-      return true;
-    }());
     setState(() {
       _playlist = playlistResponse.items;
       _playing = playlistResponse.currentItem;
     });
-    return playlistResponse;
   }
 
   _updateStatusAndPlaylist() {
@@ -569,10 +594,6 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _play(PlaylistItem item) {
-    // Preempt setting active playlist item
-    if (_playing != item && item.isMedia) {
-      _playing = item;
-    }
     _statusRequest({
       'command': 'pl_play',
       'id': item.id,
@@ -768,17 +789,10 @@ class _RemoteControlState extends State<RemoteControl> {
                       sigmaY: 2,
                     ),
                     child: FadeInImage(
-                      imageErrorBuilder: (context, error, stackTrace) =>
-                          SizedBox(),
+                      imageErrorBuilder: (_, __, ___) => SizedBox(),
                       placeholder: MemoryImage(kTransparentImage),
-                      image: NetworkImage(
-                        'http://${widget.settings.connection.authority}/art?item=${_playing.id}',
-                        headers: {
-                          'Authorization': 'Basic ' +
-                              base64Encode(utf8.encode(
-                                  ':${widget.settings.connection.password}')),
-                        },
-                      ),
+                      image:
+                          NetworkImage(_playingArtUrl, headers: _authHeaders),
                       fit: BoxFit.cover,
                     ),
                   ),
