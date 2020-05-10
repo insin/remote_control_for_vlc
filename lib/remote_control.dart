@@ -773,6 +773,8 @@ class _RemoteControlState extends State<RemoteControl> {
       );
     }
 
+    var theme = Theme.of(context);
+
     return Expanded(
       child: Stack(
         children: [
@@ -832,7 +834,10 @@ class _RemoteControlState extends State<RemoteControl> {
                 subtitle:
                     item.current && _artist.isNotEmpty ? Text(_artist) : null,
                 trailing: !item.duration.isNegative
-                    ? Text(formatTime(item.duration))
+                    ? Text(formatTime(item.duration),
+                        style: item.current
+                            ? TextStyle(color: theme.primaryColor)
+                            : null)
                     : null,
                 onTap: () {
                   if (item.current) {
