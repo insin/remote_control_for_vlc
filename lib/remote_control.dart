@@ -14,9 +14,10 @@ import 'settings_screen.dart';
 import 'utils.dart';
 
 var _headerFooterBgColor = Color.fromRGBO(241, 241, 241, 1.0);
+const _tickIntervalSeconds = 1;
 const _volumeSlidingThrottleMilliseconds = 333;
 
-enum PopupMenuChoice {
+enum _PopupMenuChoice {
   AUDIO_TRACK,
   FULLSCREEN,
   SUBTITLE_TRACK,
@@ -40,47 +41,144 @@ class RemoteControl extends StatefulWidget {
 }
 
 class _RemoteControlState extends State<RemoteControl> {
-  http.Client client = http.Client();
-  int lastStatusResponseCode;
-  int lastPlaylistResponseCode;
-  VlcStatusResponse lastStatusResponse;
-  VlcPlaylistResponse lastPlaylistResponse;
-  String state = 'stopped';
-  String title = '';
-  Duration time = Duration.zero;
-  Duration length = Duration.zero;
+  //#region HTTP requests / timer state
+  http.Client _client = http.Client();
+  int _lastStatusResponseCode;
+  int _lastPlaylistResponseCode;
 
-  Timer ticker;
-  Timer delayedTimer;
-  static const _tickIntervalSecs = 1;
-  bool showTimeLeft = false;
-  bool sliding = false;
+  /// Timer which controls polling status and playlist info from VLC.
+  Timer _pollingTicker;
 
+  /// Timer used for single updates when polling is disabled.
+  Timer _singleUpdateTimer;
+  //#endregion
+
+  //#region VLC status state
+  /// Contains subtitle and audio track information for use in the menu.
+  VlcStatusResponse _lastStatusResponse;
+
+  // Fields populated from the latest VLC status response
+  String _state = 'stopped';
+  String _title = '';
+  Duration _time = Duration.zero;
+  Duration _length = Duration.zero;
   int _volume = 256;
-  int _preMuteVolume;
-  bool _volumeSliding = false;
-  DateTime _ignoreVolumeUpdatesBefore;
-  bool _showVolumeControls = false;
-  bool _animatingVolumeControls = false;
-  Timer _hideVolumeControlsTimer;
+  //#endregion
 
-  List<PlaylistItem> playlist;
-  PlaylistItem playing;
-  String currentPlId;
+  //#region Playlist state
+  List<PlaylistItem> _playlist;
+  PlaylistItem _playing;
+  //#endregion
+
+  //#region Volume state
+  /// Controls sliding the volume controls in and out.
+  bool _showVolumeControls = false;
+
+  /// Set to true while volume controls are animating.
+  bool _animatingVolumeControls = false;
+
+  /// Set to true when the user is dragging the volume slider - used to ignore
+  /// volume in status updates from VLC.
+  bool _draggingVolume = false;
+
+  /// Used to ignore volume status in any in-flight requests after we've told
+  /// VLC to change the volume.
+  DateTime _ignoreVolumeUpdatesBefore;
+
+  /// Previous volume when the volume button was long-pressed to mute.
+  int _preMuteVolume;
+
+  /// Timer used for automatically hiding the volume controls after a delay.
+  Timer _hideVolumeControlsTimer;
+  //#endregion
+
+  //#region Time state
+  /// Toggles between showing length and time left in the track timing section.
+  bool _showTimeLeft = false;
+
+  /// Set to true when the user is dragging the time slider - used to ignore
+  /// time in status updates from VLC.
+  bool _draggingTime = false;
+  //#endregion
 
   @override
   initState() {
-    ticker = Timer.periodic(Duration(seconds: _tickIntervalSecs), _tick);
+    _pollingTicker =
+        Timer.periodic(Duration(seconds: _tickIntervalSeconds), _tick);
     super.initState();
     _checkWifi();
   }
 
   @override
   dispose() {
-    if (ticker.isActive) {
-      ticker.cancel();
+    if (_pollingTicker.isActive) {
+      _pollingTicker.cancel();
     }
     super.dispose();
+  }
+
+  //#region Connectivity
+  _checkWifi() async {
+    var connectivityResult = await Connectivity().checkConnectivity();
+    if (connectivityResult != ConnectivityResult.wifi) {
+      _showWifiAlert(context);
+    }
+  }
+
+  _showWifiAlert(BuildContext context) async {
+    var subscription = Connectivity().onConnectivityChanged.listen((result) {
+      if (result == ConnectivityResult.wifi) {
+        Navigator.pop(context);
+      }
+    });
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Turn on Wi-Fi'),
+        content: Text(
+          'A Wi-Fi connection was not detected.\n\nVLC Remote needs to connect to your local network to control VLC.',
+        ),
+      ),
+    );
+    subscription.cancel();
+  }
+  //#endregion
+
+  //#region HTTP requests
+  Future<xml.XmlDocument> _serverRequest(String requestType,
+      [Map<String, String> queryParameters]) async {
+    http.Response response;
+    try {
+      response = await _client.get(
+        Uri.http(
+          widget.settings.connection.authority,
+          '/requests/$requestType.xml',
+          queryParameters,
+        ),
+        headers: {
+          'Authorization': 'Basic ' +
+              base64Encode(
+                  utf8.encode(':${widget.settings.connection.password}')),
+        },
+      ).timeout(Duration(seconds: 1));
+    } catch (e) {
+      _resetPlaylist();
+      assert(() {
+        print('Error: $e');
+        return true;
+      }());
+    }
+    setState(() {
+      if (requestType == 'status') {
+        _lastStatusResponseCode = response?.statusCode ?? -1;
+      } else if (requestType == 'playlist') {
+        _lastPlaylistResponseCode = response?.statusCode ?? -1;
+      }
+    });
+    if (response?.statusCode == 200) {
+      return xml.parse(utf8.decode(response.bodyBytes));
+    }
+    return null;
   }
 
   Future<VlcStatusResponse> _statusRequest(
@@ -106,7 +204,7 @@ class _RemoteControlState extends State<RemoteControl> {
             queryParameters['command'] == 'pl_pause' ||
             queryParameters['command'] == 'pl_stop');
 
-    var ignoreVolumeUpdates = _volumeSliding ||
+    var ignoreVolumeUpdates = _draggingVolume ||
         // Volume changes aren't reflected in 'volume' command responses
         queryParameters != null && queryParameters['command'] == 'volume' ||
         _ignoreVolumeUpdatesBefore != null &&
@@ -114,30 +212,29 @@ class _RemoteControlState extends State<RemoteControl> {
 
     setState(() {
       if (!ignoreStateUpdates) {
-        state = statusResponse.state;
+        _state = statusResponse.state;
       }
-      length = statusResponse.length.isNegative
+      _length = statusResponse.length.isNegative
           ? Duration.zero
           : statusResponse.length;
       if (!ignoreVolumeUpdates && statusResponse.volume != null) {
         _volume = statusResponse.volume.clamp(0, 512);
       }
-      title = statusResponse.title;
-      currentPlId = statusResponse.currentPlId;
-      if (!sliding) {
+      _title = statusResponse.title;
+      if (!_draggingTime) {
         var responseTime = statusResponse.time;
         // VLC will let time go over and under length using relative seek times
         // and will send the out-of-range time back to you before it corrects
         // itself.
         if (responseTime.isNegative) {
-          time = Duration.zero;
-        } else if (responseTime > length) {
-          time = length;
+          _time = Duration.zero;
+        } else if (responseTime > _length) {
+          _time = _length;
         } else {
-          time = responseTime;
+          _time = responseTime;
         }
       }
-      lastStatusResponse = statusResponse;
+      _lastStatusResponse = statusResponse;
     });
 
     return statusResponse;
@@ -158,112 +255,10 @@ class _RemoteControlState extends State<RemoteControl> {
       return true;
     }());
     setState(() {
-      playlist = playlistResponse.items;
-      playing = playlistResponse.currentItem;
-      lastPlaylistResponse = lastPlaylistResponse;
+      _playlist = playlistResponse.items;
+      _playing = playlistResponse.currentItem;
     });
     return playlistResponse;
-  }
-
-  Future<xml.XmlDocument> _serverRequest(String requestType,
-      [Map<String, String> queryParameters]) async {
-    http.Response response;
-    try {
-      response = await client.get(
-        Uri.http(
-          widget.settings.connection.authority,
-          '/requests/$requestType.xml',
-          queryParameters,
-        ),
-        headers: {
-          'Authorization': 'Basic ' +
-              base64Encode(
-                  utf8.encode(':${widget.settings.connection.password}')),
-        },
-      ).timeout(Duration(seconds: 1));
-    } catch (e) {
-      _resetPlaylist();
-      assert(() {
-        print('Error: ${e.runtimeType}');
-        return true;
-      }());
-    }
-    setState(() {
-      if (requestType == 'status') {
-        lastStatusResponseCode = response?.statusCode ?? -1;
-      } else if (requestType == 'playlist') {
-        lastPlaylistResponseCode = response?.statusCode ?? -1;
-      }
-    });
-    if (response?.statusCode == 200) {
-      return xml.parse(utf8.decode(response.bodyBytes));
-    }
-    return null;
-  }
-
-  _togglePolling(context) {
-    String message;
-    if (ticker.isActive) {
-      ticker.cancel();
-      message = 'Paused polling for status updates';
-    } else {
-      ticker = Timer.periodic(Duration(seconds: _tickIntervalSecs), _tick);
-      message = 'Resumed polling for status updates';
-    }
-    Scaffold.of(context).showSnackBar(SnackBar(
-      content: Text(message),
-    ));
-    setState(() {});
-  }
-
-  _checkWifi() async {
-    var connectivityResult = await Connectivity().checkConnectivity();
-    if (connectivityResult != ConnectivityResult.wifi) {
-      _showWifiAlert(context);
-    }
-  }
-
-  void _showWifiAlert(BuildContext context) async {
-    var subscription = Connectivity().onConnectivityChanged.listen((result) {
-      if (result == ConnectivityResult.wifi) {
-        Navigator.pop(context);
-      }
-    });
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Turn on Wi-Fi'),
-        content: Text(
-          'A Wi-Fi connection was not detected.\n\nVLC Remote needs to connect to your local network to control VLC.',
-        ),
-      ),
-    );
-    subscription.cancel();
-  }
-
-  _tick(timer) async {
-    _updateStatusAndPlaylist();
-  }
-
-  _scheduleSingleUpdate() async {
-    // Ticker will do the UI updates, no need to schedule any further update
-    if (ticker != null && ticker.isActive) {
-      return;
-    }
-
-    // Cancel any existing delay timer so the latest state is updated in one shot
-    if (delayedTimer != null && delayedTimer.isActive) {
-      delayedTimer.cancel();
-    }
-
-    delayedTimer =
-        Timer(Duration(seconds: _tickIntervalSecs), _updateStatusAndPlaylist);
-  }
-
-  _resetPlaylist() {
-    playing = null;
-    playlist = null;
-    title = '';
   }
 
   _updateStatusAndPlaylist() {
@@ -276,181 +271,114 @@ class _RemoteControlState extends State<RemoteControl> {
     _playlistRequest();
   }
 
-  _openMedia() async {
-    BrowseResult result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => OpenMedia(
-          prefs: widget.prefs,
-          settings: widget.settings,
-        ),
-      ),
-    );
+  /// Send a command with no arguments to VLC.
+  ///
+  /// If polling is disabled, also schedules an update to get the next status.
+  _statusCommand(String command) {
+    _statusRequest({'command': command});
+    _scheduleSingleUpdate();
+  }
+  //#endregion
 
-    if (result == null) {
+  //#region Polling and timers
+  _tick(timer) async {
+    _updateStatusAndPlaylist();
+  }
+
+  _togglePolling(context) {
+    String message;
+    if (_pollingTicker.isActive) {
+      _pollingTicker.cancel();
+      message = 'Paused polling for status updates';
+    } else {
+      _pollingTicker =
+          Timer.periodic(Duration(seconds: _tickIntervalSeconds), _tick);
+      message = 'Resumed polling for status updates';
+    }
+    Scaffold.of(context).showSnackBar(SnackBar(
+      content: Text(message),
+    ));
+    setState(() {});
+  }
+
+  _scheduleSingleUpdate() async {
+    // Ticker will do the UI updates, no need to schedule any further update
+    if (_pollingTicker != null && _pollingTicker.isActive) {
       return;
     }
 
-    _statusRequest({
-      'command':
-          result.intent == BrowseResultIntent.play ? 'in_play' : 'in_enqueue',
-      'input': result.item.playlistUri,
-    });
-    _scheduleSingleUpdate();
-  }
-
-  _play(PlaylistItem item) {
-    // Preempt setting active playlist item
-    if (playing != item && item.isMedia) {
-      playing = item;
+    // Cancel any existing delay timer so the latest state is updated in one shot
+    if (_singleUpdateTimer != null && _singleUpdateTimer.isActive) {
+      _singleUpdateTimer.cancel();
     }
-    _statusRequest({
-      'command': 'pl_play',
-      'id': item.id,
-    });
-    _scheduleSingleUpdate();
+
+    _singleUpdateTimer = Timer(
+        Duration(seconds: _tickIntervalSeconds), _updateStatusAndPlaylist);
+  }
+  //#endregion
+
+  //#region Playlist
+  _resetPlaylist() {
+    _playing = null;
+    _playlist = null;
+    _title = '';
   }
 
-  _previous() {
-    _statusRequest({'command': 'pl_previous'});
-    _scheduleSingleUpdate();
-  }
-
-  _next() {
-    _statusRequest({'command': 'pl_next'});
-    _scheduleSingleUpdate();
-  }
-
-  _delete(PlaylistItem item) async {
+  _deletePlaylistItem(PlaylistItem item) {
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Remove item from playlist?'),
-          content: Text(item.title),
-          actions: <Widget>[
-            FlatButton(
-              child: Text("CANCEL"),
-              onPressed: () {
-                Navigator.pop(context);
-              },
-            ),
-            FlatButton(
-              child: Text("REMOVE"),
-              autofocus: true,
-              onPressed: () {
-                _statusRequest({
-                  'command': 'pl_delete',
-                  'id': item.id,
-                });
-                _scheduleSingleUpdate();
-                Navigator.pop(context);
-              },
-            )
-          ],
-        );
-      },
+      builder: (BuildContext context) => AlertDialog(
+        title: Text('Remove item from playlist?'),
+        content: Text(item.title),
+        actions: <Widget>[
+          FlatButton(
+            child: Text("CANCEL"),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+          ),
+          FlatButton(
+            child: Text("REMOVE"),
+            onPressed: () {
+              _statusRequest({
+                'command': 'pl_delete',
+                'id': item.id,
+              });
+              _scheduleSingleUpdate();
+              Navigator.pop(context);
+            },
+          )
+        ],
+      ),
     );
   }
+  //#endregion
 
-  _emptyPlaylist() {
-    _statusRequest({'command': 'pl_empty'});
-    _scheduleSingleUpdate();
-  }
-
-  _toggleRandom() {
-    _statusRequest({'command': 'pl_random'});
-    _scheduleSingleUpdate();
-  }
-
-  _toggleRepeat() {
-    _statusRequest({'command': 'pl_repeat'});
-    _scheduleSingleUpdate();
-  }
-
-  _toggleLoop() {
-    _statusRequest({'command': 'pl_loop'});
-    _scheduleSingleUpdate();
-  }
-
-  _seekPercent(int percent) async {
-    _statusRequest({
-      'command': 'seek',
-      'val': '$percent%',
-    });
-    _scheduleSingleUpdate();
-  }
-
-  _seekRelative(int seekTime) {
-    _statusRequest({
-      'command': 'seek',
-      'val': '${seekTime > 0 ? '+' : ''}${seekTime}S',
-    });
-    _scheduleSingleUpdate();
-  }
-
-  int _scaleVolumePercent(double percent) =>
-      (percent * volumeSliderScaleFactor).round();
-
-  _volumePercent(double percent, {bool finished = true}) {
-    _ignoreVolumeUpdatesBefore = DateTime.now();
-    // Preempt the expected volume
-    setState(() {
-      _volume = _scaleVolumePercent(percent);
-    });
-    _statusRequest({
-      'command': 'volume',
-      'val': '${_scaleVolumePercent(percent)}',
-    });
-    if (finished) {
-      _scheduleSingleUpdate();
+  //#region Popup menu
+  _onPopupMenuChoice(_PopupMenuChoice choice) {
+    switch (choice) {
+      case _PopupMenuChoice.AUDIO_TRACK:
+        _chooseAudioTrack();
+        break;
+      case _PopupMenuChoice.FULLSCREEN:
+        _toggleFullScreen();
+        break;
+      case _PopupMenuChoice.SUBTITLE_TRACK:
+        _chooseSubtitleTrack();
+        break;
+      case _PopupMenuChoice.RANDOM_PLAY:
+        _toggleRandom();
+        break;
+      case _PopupMenuChoice.REPEAT:
+        _toggleRepeat();
+        break;
+      case _PopupMenuChoice.LOOP:
+        _toggleLoop();
+        break;
+      case _PopupMenuChoice.EMPTY_PLAYLIST:
+        _emptyPlaylist();
+        break;
     }
-  }
-
-  _volumeRelative(int relativeValue) {
-    // Nothing to do if already min or max
-    if ((_volume <= 0 && relativeValue < 0) ||
-        (_volume >= 512 && relativeValue > 0)) return;
-    _ignoreVolumeUpdatesBefore = DateTime.now();
-    // Preempt the expected volume
-    setState(() {
-      _volume = (_volume + relativeValue).clamp(0, 512);
-      if (_volume == 0) {
-        _preMuteVolume = null;
-      }
-    });
-    _statusRequest({
-      'command': 'volume',
-      'val': '${relativeValue > 0 ? '+' : ''}$relativeValue',
-    });
-    _scheduleSingleUpdate();
-  }
-
-  _pause() {
-    // Preempt the expected state so the button feels more responsive
-    setState(() {
-      state = (state == 'playing' ? 'paused' : 'playing');
-    });
-    _statusRequest({
-      'command': 'pl_pause',
-    });
-    _scheduleSingleUpdate();
-  }
-
-  _stop() {
-    _statusRequest({'command': 'pl_stop'});
-    _scheduleSingleUpdate();
-  }
-
-  double _volumeSliderValue() {
-    return _volume / volumeSliderScaleFactor;
-  }
-
-  double _sliderValue() {
-    if (length.inSeconds == 0) {
-      return 0.0;
-    }
-    return (time.inSeconds / length.inSeconds * 100);
   }
 
   Future<LanguageTrack> _chooseLanguageTrack(List<LanguageTrack> options,
@@ -483,9 +411,9 @@ class _RemoteControlState extends State<RemoteControl> {
     );
   }
 
-  void _chooseSubtitleTrack() async {
+  _chooseSubtitleTrack() async {
     LanguageTrack subtitleTrack = await _chooseLanguageTrack(
-        lastStatusResponse.subtitleTracks,
+        _lastStatusResponse.subtitleTracks,
         allowNone: true);
     if (subtitleTrack != null) {
       _statusRequest({
@@ -495,9 +423,9 @@ class _RemoteControlState extends State<RemoteControl> {
     }
   }
 
-  void _chooseAudioTrack() async {
+  _chooseAudioTrack() async {
     LanguageTrack audioTrack =
-        await _chooseLanguageTrack(lastStatusResponse.audioTracks);
+        await _chooseLanguageTrack(_lastStatusResponse.audioTracks);
     if (audioTrack != null) {
       _statusRequest({
         'command': 'audio_track',
@@ -506,13 +434,68 @@ class _RemoteControlState extends State<RemoteControl> {
     }
   }
 
-  void _toggleFullScreen() {
-    _statusRequest({
-      'command': 'fullscreen',
-    });
+  _toggleFullScreen() {
+    _statusCommand('fullscreen');
   }
 
-  void _toggleVolumeControls([bool show]) {
+  _toggleRandom() {
+    _statusCommand('pl_random');
+  }
+
+  _toggleRepeat() {
+    _statusCommand('pl_repeat');
+  }
+
+  _toggleLoop() {
+    _statusCommand('pl_loop');
+  }
+
+  _emptyPlaylist() {
+    _statusCommand('pl_empty');
+  }
+  //#endregion
+
+  //#region Volume control/slider
+  double get _volumeSliderValue => _volume / volumeSliderScaleFactor;
+
+  int _scaleVolumePercent(double percent) =>
+      (percent * volumeSliderScaleFactor).round();
+
+  _setVolumePercent(double percent, {bool finished = true}) {
+    _ignoreVolumeUpdatesBefore = DateTime.now();
+    // Preempt the expected volume
+    setState(() {
+      _volume = _scaleVolumePercent(percent);
+    });
+    _statusRequest({
+      'command': 'volume',
+      'val': '${_scaleVolumePercent(percent)}',
+    });
+    if (finished) {
+      _scheduleSingleUpdate();
+    }
+  }
+
+  _setVolumeRelative(int relativeValue) {
+    // Nothing to do if already min or max
+    if ((_volume <= 0 && relativeValue < 0) ||
+        (_volume >= 512 && relativeValue > 0)) return;
+    _ignoreVolumeUpdatesBefore = DateTime.now();
+    // Preempt the expected volume
+    setState(() {
+      _volume = (_volume + relativeValue).clamp(0, 512);
+      if (_volume == 0) {
+        _preMuteVolume = null;
+      }
+    });
+    _statusRequest({
+      'command': 'volume',
+      'val': '${relativeValue > 0 ? '+' : ''}$relativeValue',
+    });
+    _scheduleSingleUpdate();
+  }
+
+  _toggleVolumeControls([bool show]) {
     if (show == null) {
       show = !_showVolumeControls;
     }
@@ -527,44 +510,107 @@ class _RemoteControlState extends State<RemoteControl> {
     }
   }
 
-  void _cancelHidingVolumeControls() {
+  _cancelHidingVolumeControls() {
     if (_hideVolumeControlsTimer != null && _hideVolumeControlsTimer.isActive) {
       _hideVolumeControlsTimer.cancel();
       _hideVolumeControlsTimer = null;
     }
   }
 
-  void _scheduleHidingVolumeControls([int seconds = 4]) {
+  _scheduleHidingVolumeControls([int seconds = 4]) {
     _cancelHidingVolumeControls();
     _hideVolumeControlsTimer =
         Timer(Duration(seconds: seconds), () => _toggleVolumeControls(false));
   }
+  //#endregion
 
-  void _onPopupMenuChoice(PopupMenuChoice choice) {
-    switch (choice) {
-      case PopupMenuChoice.AUDIO_TRACK:
-        _chooseAudioTrack();
-        break;
-      case PopupMenuChoice.FULLSCREEN:
-        _toggleFullScreen();
-        break;
-      case PopupMenuChoice.SUBTITLE_TRACK:
-        _chooseSubtitleTrack();
-        break;
-      case PopupMenuChoice.RANDOM_PLAY:
-        _toggleRandom();
-        break;
-      case PopupMenuChoice.REPEAT:
-        _toggleRepeat();
-        break;
-      case PopupMenuChoice.LOOP:
-        _toggleLoop();
-        break;
-      case PopupMenuChoice.EMPTY_PLAYLIST:
-        _emptyPlaylist();
-        break;
+  //#region Time/seek slider
+  double get _seekSliderValue {
+    if (_length.inSeconds == 0) {
+      return 0.0;
     }
+    return (_time.inSeconds / _length.inSeconds * 100);
   }
+
+  _seekPercent(int percent) async {
+    _statusRequest({
+      'command': 'seek',
+      'val': '$percent%',
+    });
+    _scheduleSingleUpdate();
+  }
+
+  _seekRelative(int seekTime) {
+    _statusRequest({
+      'command': 'seek',
+      'val': '${seekTime > 0 ? '+' : ''}${seekTime}S',
+    });
+    _scheduleSingleUpdate();
+  }
+
+  _toggleShowTimeLeft() {
+    setState(() {
+      _showTimeLeft = !_showTimeLeft;
+    });
+  }
+  //#endregion
+
+  //#region Media controls
+  _stop() {
+    _statusCommand('pl_stop');
+  }
+
+  _previous() {
+    _statusCommand('pl_previous');
+  }
+
+  _play(PlaylistItem item) {
+    // Preempt setting active playlist item
+    if (_playing != item && item.isMediaFile) {
+      _playing = item;
+    }
+    _statusRequest({
+      'command': 'pl_play',
+      'id': item.id,
+    });
+    _scheduleSingleUpdate();
+  }
+
+  _pause() {
+    // Preempt the expected state so the button feels more responsive
+    setState(() {
+      _state = (_state == 'playing' ? 'paused' : 'playing');
+    });
+    _statusCommand('pl_pause');
+  }
+
+  _next() {
+    _statusCommand('pl_next');
+  }
+
+  _openMedia() async {
+    BrowseResult result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OpenMedia(
+          prefs: widget.prefs,
+          settings: widget.settings,
+        ),
+      ),
+    );
+
+    if (result == null) {
+      return;
+    }
+
+    _statusRequest({
+      'command':
+          result.intent == BrowseResultIntent.play ? 'in_play' : 'in_enqueue',
+      'input': result.item.playlistUri,
+    });
+    _scheduleSingleUpdate();
+  }
+  //#endregion
 
   @override
   Widget build(BuildContext context) {
@@ -582,11 +628,11 @@ class _RemoteControlState extends State<RemoteControl> {
                     contentPadding: EdgeInsets.only(left: 14),
                     dense: widget.settings.dense,
                     title: Text(
-                      playing == null && title.isEmpty
+                      _playing == null && _title.isEmpty
                           ? 'VLC Remote 1.2.0'
-                          : playing?.title ??
+                          : _playing?.title ??
                               cleanVideoTitle(
-                                  title.split(RegExp(r'[\\/]')).last),
+                                  _title.split(RegExp(r'[\\/]')).last),
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
@@ -594,7 +640,9 @@ class _RemoteControlState extends State<RemoteControl> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Visibility(
-                          visible: ticker != null ? !ticker.isActive : true,
+                          visible: _pollingTicker != null
+                              ? !_pollingTicker.isActive
+                              : true,
                           child: IconButton(
                             icon: Icon(Icons.refresh),
                             onPressed: _updateStatusAndPlaylist,
@@ -621,53 +669,54 @@ class _RemoteControlState extends State<RemoteControl> {
                           },
                         ),
                         Visibility(
-                          visible: lastStatusResponseCode == 200,
-                          child: PopupMenuButton<PopupMenuChoice>(
+                          visible: _lastStatusResponseCode == 200,
+                          child: PopupMenuButton<_PopupMenuChoice>(
                             onSelected: _onPopupMenuChoice,
                             itemBuilder: (context) {
                               return [
                                 PopupMenuItem(
                                   child: Text('Select subtitle track'),
-                                  value: PopupMenuChoice.SUBTITLE_TRACK,
+                                  value: _PopupMenuChoice.SUBTITLE_TRACK,
                                   enabled:
-                                      (lastStatusResponse?.subtitleTracks ?? [])
+                                      (_lastStatusResponse?.subtitleTracks ??
+                                              [])
                                           .isNotEmpty,
                                 ),
                                 PopupMenuItem(
                                   child: Text('Select audio track'),
-                                  value: PopupMenuChoice.AUDIO_TRACK,
+                                  value: _PopupMenuChoice.AUDIO_TRACK,
                                   enabled:
-                                      (lastStatusResponse?.audioTracks ?? [])
+                                      (_lastStatusResponse?.audioTracks ?? [])
                                           .isNotEmpty,
                                 ),
                                 PopupMenuItem(
                                   child: Text('Turn fullscreen '
-                                      '${lastStatusResponse.fullscreen ? 'OFF' : 'ON'}'),
-                                  value: PopupMenuChoice.FULLSCREEN,
-                                  enabled: lastStatusResponse != null,
+                                      '${_lastStatusResponse.fullscreen ? 'OFF' : 'ON'}'),
+                                  value: _PopupMenuChoice.FULLSCREEN,
+                                  enabled: _lastStatusResponse != null,
                                 ),
                                 PopupMenuItem(
                                   child: Text('Turn random play '
-                                      '${lastStatusResponse.random ? 'OFF' : 'ON'}'),
-                                  value: PopupMenuChoice.RANDOM_PLAY,
-                                  enabled: lastStatusResponse != null,
+                                      '${_lastStatusResponse.random ? 'OFF' : 'ON'}'),
+                                  value: _PopupMenuChoice.RANDOM_PLAY,
+                                  enabled: _lastStatusResponse != null,
                                 ),
                                 PopupMenuItem(
                                   child: Text('Turn repeat '
-                                      '${lastStatusResponse.repeat ? 'OFF' : 'ON'}'),
-                                  value: PopupMenuChoice.REPEAT,
-                                  enabled: lastStatusResponse != null,
+                                      '${_lastStatusResponse.repeat ? 'OFF' : 'ON'}'),
+                                  value: _PopupMenuChoice.REPEAT,
+                                  enabled: _lastStatusResponse != null,
                                 ),
                                 PopupMenuItem(
                                   child: Text('Turn looping '
-                                      '${lastStatusResponse.loop ? 'OFF' : 'ON'}'),
-                                  value: PopupMenuChoice.LOOP,
-                                  enabled: lastStatusResponse != null,
+                                      '${_lastStatusResponse.loop ? 'OFF' : 'ON'}'),
+                                  value: _PopupMenuChoice.LOOP,
+                                  enabled: _lastStatusResponse != null,
                                 ),
                                 PopupMenuItem(
                                   child: Text('Clear playlist'),
-                                  value: PopupMenuChoice.EMPTY_PLAYLIST,
-                                  enabled: lastStatusResponse != null,
+                                  value: _PopupMenuChoice.EMPTY_PLAYLIST,
+                                  enabled: _lastStatusResponse != null,
                                 ),
                               ];
                             },
@@ -679,11 +728,11 @@ class _RemoteControlState extends State<RemoteControl> {
                 ),
               ),
               Divider(height: 0),
-              _body(),
+              _buildPlaylist(),
               !_showVolumeControls && !_animatingVolumeControls
                   ? Divider(height: 0)
                   : SizedBox(height: 0),
-              _footer(),
+              _buildFooter(),
             ],
           ),
         ),
@@ -691,12 +740,12 @@ class _RemoteControlState extends State<RemoteControl> {
     );
   }
 
-  Widget _body() {
-    if (playlist == null || playlist.isEmpty) {
+  Widget _buildPlaylist() {
+    if (_playlist == null || _playlist.isEmpty) {
       return Expanded(
         child: Padding(
           padding: EdgeInsets.all(32),
-          child: lastPlaylistResponseCode == 200
+          child: _lastPlaylistResponseCode == 200
               ? Stack(alignment: AlignmentDirectional.center, children: [
                   Image.asset('assets/icon-512.png'),
                   Positioned(
@@ -714,12 +763,12 @@ class _RemoteControlState extends State<RemoteControl> {
       child: Stack(
         children: [
           ListView.builder(
-            itemCount: playlist.length,
+            itemCount: _playlist.length,
             itemBuilder: (context, index) {
-              var item = playlist[index];
+              var item = _playlist[index];
               var icon = item.icon;
               if (item.current) {
-                switch (state) {
+                switch (_state) {
                   case 'stopped':
                     icon = Icons.stop;
                     break;
@@ -754,7 +803,7 @@ class _RemoteControlState extends State<RemoteControl> {
                   }
                 },
                 onLongPress: () {
-                  _delete(item);
+                  _deletePlaylistItem(item);
                 },
               );
             },
@@ -808,7 +857,7 @@ class _RemoteControlState extends State<RemoteControl> {
                           if (!_showVolumeControls) {
                             _showVolumeControls = true;
                           }
-                          _volumeRelative(-25);
+                          _setVolumeRelative(-25);
                           _scheduleHidingVolumeControls(2);
                         }
                       : null,
@@ -817,13 +866,13 @@ class _RemoteControlState extends State<RemoteControl> {
                 Expanded(
                   flex: 1,
                   child: Slider(
-                    label: '${_volumeSliderValue().round()}%',
+                    label: '${_volumeSliderValue.round()}%',
                     divisions: 200,
                     max: 200,
-                    value: _volumeSliderValue(),
+                    value: _volumeSliderValue,
                     onChangeStart: (percent) {
                       setState(() {
-                        _volumeSliding = true;
+                        _draggingVolume = true;
                         if (!_showVolumeControls) {
                           _showVolumeControls = true;
                         }
@@ -835,15 +884,15 @@ class _RemoteControlState extends State<RemoteControl> {
                         _volume = _scaleVolumePercent(percent);
                       });
                       Throttle.milliseconds(_volumeSlidingThrottleMilliseconds,
-                          _volumePercent, [percent], {#finished: false});
+                          _setVolumePercent, [percent], {#finished: false});
                     },
                     onChangeEnd: (percent) {
-                      _volumePercent(percent);
+                      _setVolumePercent(percent);
                       if (percent == 0.0) {
                         _preMuteVolume = null;
                       }
                       setState(() {
-                        _volumeSliding = false;
+                        _draggingVolume = false;
                       });
                       _scheduleHidingVolumeControls(2);
                     },
@@ -858,7 +907,7 @@ class _RemoteControlState extends State<RemoteControl> {
                           if (!_showVolumeControls) {
                             _showVolumeControls = true;
                           }
-                          _volumeRelative(25);
+                          _setVolumeRelative(25);
                           _scheduleHidingVolumeControls(2);
                         }
                       : null,
@@ -871,11 +920,11 @@ class _RemoteControlState extends State<RemoteControl> {
     );
   }
 
-  Widget _footer() {
+  Widget _buildFooter() {
     var theme = Theme.of(context);
     return Visibility(
       visible:
-          widget.settings.connection.isValid && lastStatusResponseCode == 200,
+          widget.settings.connection.isValid && _lastStatusResponseCode == 200,
       child: Container(
         color: _headerFooterBgColor,
         child: Column(
@@ -890,9 +939,9 @@ class _RemoteControlState extends State<RemoteControl> {
                         _togglePolling(context);
                       },
                       child: Text(
-                        state != 'stopped' ? formatTime(time) : '––:––',
+                        _state != 'stopped' ? formatTime(_time) : '––:––',
                         style: TextStyle(
-                          color: ticker.isActive
+                          color: _pollingTicker.isActive
                               ? theme.textTheme.bodyText2.color
                               : theme.disabledColor,
                         ),
@@ -902,39 +951,36 @@ class _RemoteControlState extends State<RemoteControl> {
                   Expanded(
                     child: Slider(
                       divisions: 100,
-                      max: state != 'stopped' ? 100 : 0,
-                      value: _sliderValue(),
+                      max: _state != 'stopped' ? 100 : 0,
+                      value: _seekSliderValue,
                       onChangeStart: (percent) {
                         setState(() {
-                          sliding = true;
+                          _draggingTime = true;
                         });
                       },
                       onChanged: (percent) {
                         setState(() {
-                          time = Duration(
-                            seconds: (length.inSeconds / 100 * percent).round(),
+                          _time = Duration(
+                            seconds:
+                                (_length.inSeconds / 100 * percent).round(),
                           );
                         });
                       },
                       onChangeEnd: (percent) async {
                         await _seekPercent(percent.round());
                         setState(() {
-                          sliding = false;
+                          _draggingTime = false;
                         });
                       },
                     ),
                   ),
                   GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        showTimeLeft = !showTimeLeft;
-                      });
-                    },
+                    onTap: _toggleShowTimeLeft,
                     child: Text(
-                      state != 'stopped' && length != Duration.zero
-                          ? showTimeLeft
-                              ? '-' + formatTime(length - time)
-                              : formatTime(length)
+                      _state != 'stopped' && _length != Duration.zero
+                          ? _showTimeLeft
+                              ? '-' + formatTime(_length - _time)
+                              : formatTime(_length)
                           : '––:––',
                     ),
                   ),
@@ -945,9 +991,9 @@ class _RemoteControlState extends State<RemoteControl> {
                       onLongPress: () {
                         if (_volume > 0) {
                           _preMuteVolume = _volume;
-                          _volumePercent(0);
+                          _setVolumePercent(0);
                         } else {
-                          _volumePercent(_preMuteVolume != null
+                          _setVolumePercent(_preMuteVolume != null
                               ? _preMuteVolume / volumeSliderScaleFactor
                               : 100);
                         }
@@ -1003,7 +1049,7 @@ class _RemoteControlState extends State<RemoteControl> {
                       child: TweenAnimationBuilder(
                         tween: Tween<double>(
                             begin: 0.0,
-                            end: state == 'paused' || state == 'stopped'
+                            end: _state == 'paused' || _state == 'stopped'
                                 ? 0.0
                                 : 1.0),
                         duration: Duration(milliseconds: 250),

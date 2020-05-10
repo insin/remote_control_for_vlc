@@ -336,7 +336,7 @@ class PlaylistItem {
 
   bool get isFile => uri.startsWith('file:');
 
-  bool get isMedia => isAudio || isVideo;
+  bool get isMediaFile => isAudio || isVideo;
 
   bool get isVideo => _videoExtensions.hasMatch(uri);
 
