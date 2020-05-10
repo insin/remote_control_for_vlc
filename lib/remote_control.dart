@@ -72,6 +72,8 @@ class _RemoteControlState extends State<RemoteControl> {
   //#region Playlist state
   List<PlaylistItem> _playlist;
   PlaylistItem _playing;
+  String _backgroundArtUrl;
+  bool _reusingBackgroundArt = false;
   //#endregion
 
   //#region Volume state
@@ -154,8 +156,8 @@ class _RemoteControlState extends State<RemoteControl> {
             base64Encode(utf8.encode(':${widget.settings.connection.password}'))
       };
 
-  get _playingArtUrl =>
-      'http://${widget.settings.connection.authority}/art?item=${_playing.id}';
+  String _artUrlForPlid(String plid) =>
+      'http://${widget.settings.connection.authority}/art?item=$plid';
 
   /// Send a request to the named VLC API [endpoint] with any [queryParameters]
   /// given and return parsed response XML if successful.
@@ -255,8 +257,11 @@ class _RemoteControlState extends State<RemoteControl> {
       if (!ignoreVolumeUpdates && statusResponse.volume != null) {
         _volume = statusResponse.volume.clamp(0, 512);
       }
-      _title = statusResponse.title;
-      _artist = statusResponse.artist;
+      // Keep the current title and artist when playback is stopped
+      if (statusResponse.currentPlId != '-1') {
+        _title = statusResponse.title;
+        _artist = statusResponse.artist;
+      }
       if (!_draggingTime) {
         var responseTime = statusResponse.time;
         // VLC will let time go over and under length using relative seek times
@@ -268,6 +273,19 @@ class _RemoteControlState extends State<RemoteControl> {
           _time = _length;
         } else {
           _time = responseTime;
+        }
+      }
+      // Set the background art URL when the current playlist item changes.
+      // Keep the current URL when playback is stopped.
+      if (statusResponse.currentPlId != '-1' &&
+          statusResponse.currentPlId != _lastStatusResponse?.currentPlId) {
+        // Keep using the existing URL if the new item has artwork and both
+        // items are using the same artwork file.
+        _reusingBackgroundArt = _backgroundArtUrl != null &&
+            statusResponse.artworkUrl != null &&
+            statusResponse.artworkUrl == _lastStatusResponse?.artworkUrl;
+        if (!_reusingBackgroundArt) {
+          _backgroundArtUrl = _artUrlForPlid(statusResponse.currentPlId);
         }
       }
       _lastStatusResponse = statusResponse;
@@ -349,6 +367,8 @@ class _RemoteControlState extends State<RemoteControl> {
   //#region Playlist
   _resetPlaylist() {
     _playing = null;
+    _backgroundArtUrl = null;
+    _reusingBackgroundArt = false;
     _playlist = null;
     _title = '';
   }
@@ -790,13 +810,7 @@ class _RemoteControlState extends State<RemoteControl> {
                       sigmaX: 2,
                       sigmaY: 2,
                     ),
-                    child: FadeInImage(
-                      imageErrorBuilder: (_, __, ___) => SizedBox(),
-                      placeholder: MemoryImage(kTransparentImage),
-                      image:
-                          NetworkImage(_playingArtUrl, headers: _authHeaders),
-                      fit: BoxFit.cover,
-                    ),
+                    child: _buildBackgroundImage(),
                   ),
                 ),
               ),
@@ -878,6 +892,22 @@ class _RemoteControlState extends State<RemoteControl> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildBackgroundImage() {
+    if (_reusingBackgroundArt) {
+      return Image(
+        image: NetworkImage(_backgroundArtUrl, headers: _authHeaders),
+        gaplessPlayback: true,
+        fit: BoxFit.cover,
+      );
+    }
+    return FadeInImage(
+      imageErrorBuilder: (_, __, ___) => SizedBox(),
+      placeholder: MemoryImage(kTransparentImage),
+      image: NetworkImage(_backgroundArtUrl, headers: _authHeaders),
+      fit: BoxFit.cover,
     );
   }
 

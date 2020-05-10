@@ -244,6 +244,8 @@ class VlcStatusResponse {
 
   String get artist => _metadata['artist'] ?? '';
 
+  String get artworkUrl => _metadata['artwork_url'];
+
   bool get fullscreen =>
       document.findAllElements('fullscreen').first.text == 'true';
 
