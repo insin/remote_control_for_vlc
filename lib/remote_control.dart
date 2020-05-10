@@ -1059,7 +1059,7 @@ class _RemoteControlState extends State<RemoteControl> {
                       size: 30,
                     ),
                     onTap: () {
-                      _seekRelative(-5);
+                      _seekRelative(-10);
                     },
                   ),
                   // Play/pause button
@@ -1090,7 +1090,7 @@ class _RemoteControlState extends State<RemoteControl> {
                       size: 30,
                     ),
                     onTap: () {
-                      _seekRelative(5);
+                      _seekRelative(10);
                     },
                   ),
                   Expanded(child: VerticalDivider()),
