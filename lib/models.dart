@@ -90,8 +90,8 @@ class BrowseResult {
 // ignore: unused_element
 const _emulatorLocalhost = '10.0.2.2';
 
-const _defaultPort = '8080';
-const _defaultPassword = 'vlcplayer';
+const defaultPort = '8080';
+const defaultPassword = 'vlcplayer';
 
 var _ipPattern = RegExp(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$');
 var _numericPattern = RegExp(r'^\d+$');
@@ -115,6 +115,10 @@ class Connection {
   get passwordError => _passwordError;
 
   String get authority => '$_ip:$_port';
+
+  /// The connection stored in [Settings] will only have an IP if it's been
+  /// successfully tested.
+  bool get hasIp => _ip != null && _ip.isNotEmpty;
 
   bool get isValid =>
       _ipError == null && _portError == null && _passwordError == null;
@@ -155,8 +159,8 @@ class Connection {
 
   Connection.fromJson(Map<String, dynamic> json) {
     ip = json['ip'] ?? '';
-    port = json['port'] ?? _defaultPort;
-    password = json['password'] ?? _defaultPassword;
+    port = json['port'] ?? defaultPort;
+    password = json['password'] ?? defaultPassword;
   }
 
   Map<String, dynamic> toJson() => {

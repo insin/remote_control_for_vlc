@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'models.dart';
 
@@ -52,6 +53,11 @@ class _EnqueueMenuGestureDetectorState
     );
   }
 }
+
+/// A [WhitelistingTextInputFormatter] that takes in digits `[0-9]` and periods
+/// `.` only.
+var ipWhitelistingTextInputFormatter =
+    WhitelistingTextInputFormatter(RegExp(r'[\d.]+'));
 
 /// Remove current focus to hide the keyboard.
 removeCurrentFocus(BuildContext context) {

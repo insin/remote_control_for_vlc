@@ -34,6 +34,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String prefilledIpSuffix;
   bool showPassword = false;
 
+  bool scanningNetwork = false;
+
   bool testingConnection = false;
   String connectionTestResult;
   String connectionTestResultDescription;
@@ -107,7 +109,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (await Connectivity().checkConnectivity() == ConnectivityResult.wifi) {
       var ip = await Connectivity().getWifiIP();
       setState(() {
-        prefilledIpSuffix = ip.substring(0, ip.lastIndexOf(RegExp(r'\.')) + 1);
+        prefilledIpSuffix = ip.substring(0, ip.lastIndexOf('.') + 1);
         ipController.text = prefilledIpSuffix;
       });
     }
@@ -188,6 +190,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         .copyWith(fontWeight: FontWeight.bold, color: theme.primaryColor);
     return Scaffold(
       appBar: AppBar(
+        centerTitle: true,
         title: Text('Settings'),
       ),
       body: ListView(children: <Widget>[
@@ -204,6 +207,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             controller: ipController,
             focusNode: ipFocus,
             keyboardType: TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [ipWhitelistingTextInputFormatter],
             decoration: InputDecoration(
               isDense: widget.settings.dense,
               icon: Icon(Icons.computer),
@@ -239,60 +243,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
             decoration: InputDecoration(
               isDense: widget.settings.dense,
               icon: Icon(Icons.vpn_key),
-              suffixIcon: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    showPassword = !showPassword;
-                  });
-                },
-                child: Icon(Icons.remove_red_eye),
-              ),
               labelText: 'Password',
               errorText: passwordDirty ? connection.passwordError : null,
             ),
+          ),
+          trailing: IconButton(
+            onPressed: () {
+              setState(() {
+                showPassword = !showPassword;
+              });
+            },
+            tooltip: 'Toggle password visibility',
+            icon: Icon(Icons.remove_red_eye,
+                color: showPassword ? theme.primaryColor : null),
           ),
         ),
         ListTile(
           dense: widget.settings.dense,
           title: RaisedButton(
             color: theme.buttonTheme.colorScheme.primary,
-            // XXX Hardcoding as theme colouring doesn't seem to be working
             textColor: Colors.white,
             onPressed: !testingConnection ? _testConnection : null,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                Icon(Icons.network_check),
+                testingConnection
+                    ? Padding(
+                        padding: const EdgeInsets.all(4.0),
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white)),
+                        ),
+                      )
+                    : Icon(Icons.network_check),
                 const SizedBox(width: 8.0),
-                Text('Test Connection'),
+                Text('Test & Save Connection'),
               ],
             ),
           ),
         ),
-        Visibility(
-          visible: testingConnection || connectionTestResult != null,
-          child: ListTile(
+        if (connectionTestResult != null)
+          ListTile(
             dense: widget.settings.dense,
-            leading: testingConnection
-                ? SizedBox(
-                    width: 20.0,
-                    height: 20.0,
-                    child: CircularProgressIndicator(),
-                  )
-                : Icon(
-                    connectionTestResultIcon,
-                    color: connectionTestResultIcon == Icons.check
-                        ? Colors.green
-                        : Colors.redAccent,
-                  ),
-            title: Text(testingConnection
-                ? 'Testing connection...'
-                : connectionTestResult ?? ''),
+            leading: Icon(
+              connectionTestResultIcon,
+              color: connectionTestResultIcon == Icons.check
+                  ? Colors.green
+                  : Colors.redAccent,
+            ),
+            title: Text(connectionTestResult),
             subtitle: connectionTestResultDescription != null
                 ? Text(connectionTestResultDescription)
                 : null,
           ),
-        ),
         Divider(),
         ListTile(
           dense: widget.settings.dense,

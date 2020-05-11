@@ -16,6 +16,7 @@ dependencies:
   connectivity: ^0.4.8+2
   http: ^0.12.1
   just_throttle_it: ^1.0.0
+  ping_discover_network: ^0.2.0+1
   shared_preferences: ^0.5.7
   transparent_image: ^1.0.0
   xml: ^3.5.0
@@ -30,7 +31,21 @@ flutter:
   assets:
     - assets/icon-512.png
     - assets/cone.png
+    - assets/linux-lua.png
+    - assets/linux-main-interface.png
+    - assets/linux-menu.png
+    - assets/linux-password.png
+    - assets/linux-show-settings.png
+    - assets/linux-web.png
+    - assets/mac-http-interface.png
+    - assets/mac-menu.png
     - assets/signal-0.png
     - assets/signal-1.png
     - assets/signal-2.png
     - assets/signal-3.png
+    - assets/windows-lua.png
+    - assets/windows-main-interface.png
+    - assets/windows-menu.png
+    - assets/windows-password.png
+    - assets/windows-show-settings.png
+    - assets/windows-web.png

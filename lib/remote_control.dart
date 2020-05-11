@@ -6,6 +6,7 @@ import 'package:connectivity/connectivity.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:just_throttle_it/just_throttle_it.dart';
+import 'package:ping_discover_network/ping_discover_network.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:transparent_image/transparent_image.dart';
 import 'package:xml/xml.dart' as xml;
@@ -14,6 +15,7 @@ import 'models.dart';
 import 'open_media.dart';
 import 'settings_screen.dart';
 import 'utils.dart';
+import 'vlc_configuration_guide.dart';
 
 var _headerFooterBgColor = Color.fromRGBO(241, 241, 241, 1.0);
 const _tickIntervalSeconds = 1;
@@ -43,6 +45,12 @@ class RemoteControl extends StatefulWidget {
 }
 
 class _RemoteControlState extends State<RemoteControl> {
+  //#region Setup state
+  bool _autoConnecting = false;
+  String _autoConnectError;
+  String _autoConnectHost;
+  //#endregion
+
   //#region HTTP requests / timer state
   http.Client _client = http.Client();
   int _lastStatusResponseCode;
@@ -231,7 +239,7 @@ class _RemoteControlState extends State<RemoteControl> {
 
     var statusResponse = VlcStatusResponse(document);
     assert(() {
-      print('VlcStatusRequest(${queryParameters ?? {}}) => $statusResponse');
+      //print('VlcStatusRequest(${queryParameters ?? {}}) => $statusResponse');
       return true;
     }());
 
@@ -309,7 +317,7 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _updateStatusAndPlaylist() {
-    if (widget.settings.connection.isNotValid) {
+    if (!widget.settings.connection.hasIp) {
       _resetPlaylist();
       return;
     }
@@ -361,6 +369,136 @@ class _RemoteControlState extends State<RemoteControl> {
 
     _singleUpdateTimer = Timer(
         Duration(seconds: _tickIntervalSeconds), _updateStatusAndPlaylist);
+  }
+  //#endregion
+
+  //#region Setup
+  _showConfigurationGuide() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => VlcConfigurationGuide(),
+      ),
+    );
+  }
+
+  _autoConnect() async {
+    setState(() {
+      _autoConnecting = true;
+      _autoConnectError = null;
+      _autoConnectHost = null;
+    });
+
+    if (await Connectivity().checkConnectivity() != ConnectivityResult.wifi) {
+      setState(() {
+        _autoConnecting = false;
+        _autoConnectError = 'Not connected to Wi-Fi';
+      });
+      return;
+    }
+    var ip = await Connectivity().getWifiIP();
+    var subnet = ip.substring(0, ip.lastIndexOf('.'));
+
+    final stream = NetworkAnalyzer.discover2(
+      subnet,
+      int.parse(defaultPort),
+      timeout: Duration(seconds: 1),
+    );
+
+    List<String> ips = [];
+    var subscription = stream.listen((NetworkAddress address) {
+      if (address.exists) {
+        ips.add(address.ip);
+      }
+    });
+    subscription.onError((error) {
+      subscription.cancel();
+      setState(() {
+        _autoConnecting = false;
+        _autoConnectError = 'Error scanning network: $error';
+      });
+    });
+    subscription.onDone(() {
+      if (ips.length == 0) {
+        setState(() {
+          _autoConnecting = false;
+          _autoConnectError =
+              'Couldn\'t find any hosts running port 8080 on subnet $subnet';
+        });
+        return;
+      }
+      setState(() {
+        if (ips.length > 0) {
+          _autoConnectHost =
+              'Found multiple host, using the first one: ${ips.join(', ')}';
+        }
+        _autoConnectHost = 'Found host: ${ips.first}';
+      });
+      _testConnection(ips.first);
+    });
+  }
+
+  _testConnection(String ip) async {
+    http.Response response;
+    try {
+      response = await http.get(
+          Uri.http(
+            '$ip:$defaultPort',
+            '/requests/status.xml',
+          ),
+          headers: {
+            'Authorization':
+                'Basic ' + base64Encode(utf8.encode(':$defaultPassword'))
+          }).timeout(Duration(seconds: 1));
+    } catch (e) {
+      setState(() {
+        _autoConnecting = false;
+        if (e is TimeoutException) {
+          _autoConnectError = 'Connection timed out';
+        } else {
+          _autoConnectError = 'Connection error: ${e.runtimeType}';
+        }
+      });
+      return;
+    }
+
+    if (response.statusCode != 200) {
+      setState(() {
+        _autoConnecting = false;
+        if (response.statusCode == 401) {
+          _autoConnectError =
+              'Default password was invalid – configure the connection manually.';
+        } else {
+          _autoConnectError =
+              'Unexpected response: status code: ${response.statusCode}';
+        }
+      });
+      return;
+    }
+
+    widget.settings.connection.ip = ip;
+    widget.settings.connection.port = defaultPort;
+    widget.settings.connection.password = defaultPassword;
+    widget.settings.save();
+    setState(() {
+      _autoConnecting = false;
+    });
+  }
+
+  _showSettings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SettingsScreen(
+          settings: widget.settings,
+          onSettingsChanged: () {
+            setState(() {
+              widget.settings.save();
+            });
+          },
+        ),
+      ),
+    );
   }
   //#endregion
 
@@ -691,21 +829,7 @@ class _RemoteControlState extends State<RemoteControl> {
                     IconButton(
                       icon: Icon(Icons.settings),
                       tooltip: 'Show settings',
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => SettingsScreen(
-                              settings: widget.settings,
-                              onSettingsChanged: () {
-                                setState(() {
-                                  widget.settings.save();
-                                });
-                              },
-                            ),
-                          ),
-                        );
-                      },
+                      onPressed: _showSettings,
                     ),
                     Visibility(
                       visible: _lastStatusResponseCode == 200,
@@ -764,7 +888,7 @@ class _RemoteControlState extends State<RemoteControl> {
               ),
             ),
             Divider(height: 0),
-            _buildPlaylist(),
+            _buildMainContent(),
             if (!_showVolumeControls && !_animatingVolumeControls)
               Divider(height: 0),
             _buildFooter(),
@@ -774,7 +898,113 @@ class _RemoteControlState extends State<RemoteControl> {
     );
   }
 
-  Widget _buildPlaylist() {
+  Widget _buildMainContent() {
+    final theme = Theme.of(context);
+    final headingStyle = theme.textTheme.subtitle1
+        .copyWith(fontWeight: FontWeight.bold, color: theme.primaryColor);
+    if (!widget.settings.connection.hasIp) {
+      return Expanded(
+        child: ListView(padding: EdgeInsets.all(16), children: [
+          Text('VLC Remote Setup', style: theme.textTheme.headline5),
+          SizedBox(height: 16),
+          Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('1. VLC configuration', style: headingStyle),
+            SizedBox(height: 8),
+            Text(
+                'A step-by-step guide to enabling VLC\'s web interface for remote control:'),
+            SizedBox(height: 8),
+            RaisedButton(
+              color: theme.buttonTheme.colorScheme.primary,
+              textColor: Colors.white,
+              onPressed: _showConfigurationGuide,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Icon(Icons.traffic),
+                  SizedBox(width: 8.0),
+                  Text('VLC Configuration Guide'),
+                ],
+              ),
+            ),
+          ]),
+          Divider(height: 48, color: Colors.black87),
+          Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('2. Automatic connection', style: headingStyle),
+            SizedBox(height: 8),
+            Text(
+                'Once VLC is configured, scan your local network to try to connect automatically:'),
+            SizedBox(height: 8),
+            RaisedButton(
+              color: theme.buttonTheme.colorScheme.primary,
+              textColor: Colors.white,
+              onPressed: !_autoConnecting ? _autoConnect : null,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  !_autoConnecting
+                      ? Icon(Icons.computer)
+                      : Padding(
+                          padding: const EdgeInsets.all(4.0),
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          ),
+                        ),
+                  SizedBox(width: 8.0),
+                  Text('Scan Network for VLC'),
+                ],
+              ),
+            ),
+            if (_autoConnectHost != null)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: widget.settings.dense,
+                leading: Icon(
+                  Icons.check,
+                  color: Colors.green,
+                ),
+                title: Text(_autoConnectHost),
+              ),
+            if (_autoConnectError != null)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: widget.settings.dense,
+                leading: Icon(
+                  Icons.error,
+                  color: Colors.redAccent,
+                ),
+                title: Text(_autoConnectError),
+              )
+          ]),
+          Divider(height: 48, color: Colors.black87),
+          Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('3. Manual connection', style: headingStyle),
+            SizedBox(height: 8),
+            Text(
+                'If automatic connection doesn\'t work, manually configure connection details:'),
+            SizedBox(height: 8),
+            RaisedButton(
+              color: theme.buttonTheme.colorScheme.primary,
+              textColor: Colors.white,
+              onPressed: _showSettings,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Icon(Icons.settings),
+                  SizedBox(width: 8.0),
+                  Text('Configure VLC Connection'),
+                ],
+              ),
+            )
+          ]),
+        ]),
+      );
+    }
+
     if (_playlist == null || _playlist.isEmpty) {
       return Expanded(
         child: Padding(
@@ -792,8 +1022,6 @@ class _RemoteControlState extends State<RemoteControl> {
         ),
       );
     }
-
-    var theme = Theme.of(context);
 
     return Expanded(
       child: Stack(
@@ -1217,7 +1445,7 @@ class _ConnectionAnimationState extends State<ConnectionAnimation>
         ),
         Positioned(
           bottom: 0,
-          child: Text('Trying to connect to VLC...'),
+          child: Text('Trying to connect to VLC…'),
         )
       ],
     );
