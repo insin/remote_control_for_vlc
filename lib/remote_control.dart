@@ -78,7 +78,7 @@ class _RemoteControlState extends State<RemoteControl> {
   //#endregion
 
   //#region Playlist state
-  List<PlaylistItem> _playlist;
+  List<PlaylistItem> _playlist = [];
   PlaylistItem _playing;
   String _backgroundArtUrl;
   bool _reusingBackgroundArt = false;
@@ -311,6 +311,12 @@ class _RemoteControlState extends State<RemoteControl> {
 
     var playlistResponse = VlcPlaylistResponse.fromXmlDocument(document);
     setState(() {
+      // Clear current title and background URL if the playlist is cleared
+      if (_playlist.isNotEmpty && playlistResponse.items.isEmpty) {
+        _title = '';
+        _backgroundArtUrl = '';
+        _reusingBackgroundArt = false;
+      }
       _playlist = playlistResponse.items;
       _playing = playlistResponse.currentItem;
     });
@@ -1005,7 +1011,7 @@ class _RemoteControlState extends State<RemoteControl> {
       );
     }
 
-    if (_playlist == null || _playlist.isEmpty) {
+    if (_playlist.isEmpty) {
       return Expanded(
         child: Padding(
           padding: EdgeInsets.all(32),
