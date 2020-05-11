@@ -1031,7 +1031,7 @@ class _RemoteControlState extends State<RemoteControl> {
               _playing.isAudio)
             Positioned.fill(
               child: Opacity(
-                opacity: .2,
+                opacity: .15,
                 child: ClipRect(
                   child: ImageFiltered(
                     imageFilter: ImageFilter.blur(
