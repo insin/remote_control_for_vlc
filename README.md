@@ -15,26 +15,20 @@ The app's guides for initial VLC configuration and finding your host IP if it ca
 
 ## Screenshots
 
-### Initial setup
+## Initial setup screens
 
-![](screenshots/setup.png)
-
-![](screenshots/setup-guide-os.png)
-
-![](screenshots/setup-guide-steps.png)
-
-![](screenshots/vlc-connected.png)
+| Setup screen  | Choose OS for setup guide | Setup guide | Connected |
+| ------------- | ------------------------- | ----------- | --------- |
+| [![](screenshots/setup.png)](screenshots/setup.png) | [![](screenshots/setup-guide-os.png)](screenshots/setup-guide-os.png) | [![](screenshots/setup-guide-steps.png)](screenshots/setup-guide-steps.png) | [![](screenshots/vlc-connected.png)](screenshots/vlc-connected.png) |
 
 ### Browsing for and playing media
 
-![](screenshots/open-media.png)
-
-![](screenshots/file-browser.png)
-
-![](screenshots/playing-vlc.png)
+| Open media  | File browser | Playlist |
+| ----------- | ------------ | -------- |
+| [![](screenshots/open-media.png)](screenshots/open-media.png) | [![](screenshots/file-browser.png)](screenshots/file-browser.png) | [![](screenshots/playing-vlc.png)](screenshots/playing-vlc.png) |
 
 ### Settings
 
-![](screenshots/settings.png)
-
-![](screenshots/host-ip-guide-os.png)
+| Settings screen  | Host IP guide |
+| ---------------- | ------------- |
+| [![](screenshots/settings.png)](screenshots/settings.png) | [![](screenshots/host-ip-guide-os.png)](screenshots/host-ip-guide-os.png) |
