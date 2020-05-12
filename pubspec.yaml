@@ -12,11 +12,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  connectivity: ^0.4.8+2
+  connectivity: ^0.4.8+6
   http: ^0.12.1
   just_throttle_it: ^1.0.0
   ping_discover_network: ^0.2.0+1
-  shared_preferences: ^0.5.7
+  shared_preferences: ^0.5.7+2
   transparent_image: ^1.0.0
   xml: ^3.5.0
 
