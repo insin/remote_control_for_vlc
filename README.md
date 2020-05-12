@@ -2,57 +2,16 @@
 
 A [VLC](https://www.videolan.org/vlc/) remote control written with [Flutter](https://flutter.io/).
 
-## Setup
+## Initial Setup Guides
 
-### Configure VLC on your computer
+The first time you start VLC Remote, it will provide a guide to setting up VLC's web interface
+ for remote control and will give you the option to try to discover the IP of the host VLC is
+  running on automatically.
 
-1. First, you will need to start VLC's built-in server for VLC Remote to connect to.
+The app's guides for initial VLC configuration and finding your host IP if it can't be found
+ automatically are also available here if you need to reference them on a computer:
 
-   Open VLC's preferences (**Tools → Preferences** on Windows/Linux), find the **"Show settings"** section and click **"All"** to view advanced settings:
-
-   ![](screenshots/vlc-settings.png)
-
-2. Scroll down to find the Interface → Main interfaces settings and check the **"Web"** option:
-
-   ![](screenshots/vlc-interfaces.png)
-
-3. Switch to the Interface → Main interfaces -> Lua settings and set a password for the VLC server in the "Lua HTTP" section:
-
-   VLC Remote uses **vlcplayer** as its default password - if you set this now, you'll have one less thing to configure later.
-
-   ![](screenshots/vlc-lua-http.png)
-
-4. Finally, restart VLC and open VLC Remote on your phone.
-
-### Connect to VLC from VLC Remote
-
-Use the cog icon in the title bar to open the Settings screen.
-
-For initial setup, VLC Remote will try to pre-fill the start of your LAN IP in the Host IP section.
-
-You will need to look up your computer's IP address and configure it here:
-
-<details>
-  <summary>Looking up your IP on Windows</summary>
-  <ul>
-    <li>Open a Command Prompt</li>
-    <li>Type <kbd>ipconfig</kbd> and press enter to run the command</li>
-    <li>Look for <code>IPv4 Address</code> in the command's output, which should have an IP address similar to the Host IP setting in the app</li>
-  </ul>
-</details>
-
-<details>
-  <summary>Looking up your IP on Linux/Mac</summary>
-  <ul>
-    <li>Open a Terminal</li>
-    <li>Type <kbd>ifconfig</kbd> and press enter to</li>
-    <li>Look for <code>eth0</code> in the command's output, which should have an IP address similar to the Host IP setting in the app</li>
-  </ul>
-</details>
-
-Once you've configured the Host IP address (and the Password if you didn't use `vlcplayer`) click the Test Connection button.
-
-If VLC Remote was able to successfully connect, the connection info will be saved.
+### [VLC Remote Configuration Guides](https://codepen.io/jbscript/full/BaoVYYK)
 
 ## Screenshots
 
