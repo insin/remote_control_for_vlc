@@ -513,7 +513,7 @@ class _RemoteControlState extends State<RemoteControl> {
     _playing = null;
     _backgroundArtUrl = null;
     _reusingBackgroundArt = false;
-    _playlist = null;
+    _playlist = [];
     _title = '';
   }
 
