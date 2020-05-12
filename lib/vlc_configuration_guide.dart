@@ -1,5 +1,6 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+
+import 'widgets.dart';
 
 enum _OperatingSystem { linux, macos, windows }
 
@@ -125,8 +126,7 @@ class _VlcConfigurationGuideState extends State<VlcConfigurationGuide> {
       steps: [
         Step(
           title: Text('Enable VLC\'s web interface'),
-          content: Wrap(
-            runSpacing: 16,
+          content: TextAndImages(
             children: <Widget>[
               Text(
                   'In VLC\'s menu bar, select Tools > Preferences to open the preferences window:'),
@@ -145,8 +145,7 @@ class _VlcConfigurationGuideState extends State<VlcConfigurationGuide> {
         ),
         Step(
           title: Text('Set web interface password'),
-          content: Wrap(
-            runSpacing: 16,
+          content: TextAndImages(
             children: <Widget>[
               Text(
                   'Expand the "Main interfaces" section by clicking the ">" chevron and click the "Lua" section which appears:'),
@@ -216,8 +215,7 @@ class _VlcConfigurationGuideState extends State<VlcConfigurationGuide> {
       steps: [
         Step(
           title: Text('Enable VLC\'s web interface'),
-          content: Wrap(
-            runSpacing: 16,
+          content: TextAndImages(
             children: <Widget>[
               Text(
                   'In the Menubar, select VLC > Preferences to open the preferences window:'),

@@ -54,6 +54,19 @@ class _EnqueueMenuGestureDetectorState
   }
 }
 
+/// Like [Iterable.join] but for lists of Widgets.
+Iterable<Widget> intersperseWidgets(Iterable<Widget> iterable,
+    {Widget Function() builder}) sync* {
+  final iterator = iterable.iterator;
+  if (iterator.moveNext()) {
+    yield iterator.current;
+    while (iterator.moveNext()) {
+      yield builder();
+      yield iterator.current;
+    }
+  }
+}
+
 /// A [WhitelistingTextInputFormatter] that takes in digits `[0-9]` and periods
 /// `.` only.
 var ipWhitelistingTextInputFormatter =
@@ -64,5 +77,28 @@ removeCurrentFocus(BuildContext context) {
   FocusScopeNode currentFocus = FocusScope.of(context);
   if (!currentFocus.hasPrimaryFocus) {
     currentFocus.unfocus();
+  }
+}
+
+class TextAndImages extends StatelessWidget {
+  final List<Widget> children;
+  final double spacing;
+
+  TextAndImages({@required this.children, this.spacing = 16});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: intersperseWidgets(
+        children.map((child) => Row(children: [
+              Expanded(
+                  child: Container(
+                alignment: Alignment.topLeft,
+                child: child,
+              ))
+            ])),
+        builder: () => SizedBox(height: spacing),
+      ).toList(),
+    );
   }
 }
