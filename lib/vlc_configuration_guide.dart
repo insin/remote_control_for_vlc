@@ -1,14 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'models.dart';
 import 'widgets.dart';
-
-enum _OperatingSystem { linux, macos, windows }
-
-Map<_OperatingSystem, String> _osNames = {
-  _OperatingSystem.linux: 'Linux',
-  _OperatingSystem.macos: 'macOS',
-  _OperatingSystem.windows: 'Windows',
-};
 
 class VlcConfigurationGuide extends StatefulWidget {
   @override
@@ -17,7 +10,7 @@ class VlcConfigurationGuide extends StatefulWidget {
 
 class _VlcConfigurationGuideState extends State<VlcConfigurationGuide> {
   int _currentStep = 0;
-  _OperatingSystem _os;
+  OperatingSystem _os;
 
   _onOsChanged(os) {
     setState(() {
@@ -35,7 +28,7 @@ class _VlcConfigurationGuideState extends State<VlcConfigurationGuide> {
           children: <Widget>[
             Text('VLC Configuration Guide'),
             if (_os != null)
-              Text('for ${_osNames[_os]}', style: TextStyle(fontSize: 13)),
+              Text('for ${osNames[_os]}', style: TextStyle(fontSize: 13)),
           ],
         ),
       ),
@@ -56,9 +49,9 @@ class _VlcConfigurationGuideState extends State<VlcConfigurationGuide> {
                 Text('Which operating system are you running VLC on?',
                     style: theme.textTheme.subtitle1),
                 Column(
-                    children: _OperatingSystem.values
+                    children: OperatingSystem.values
                         .map((os) => RadioListTile(
-                              title: Text(_osNames[os]),
+                              title: Text(osNames[os]),
                               value: os,
                               groupValue: _os,
                               onChanged: _onOsChanged,
@@ -71,11 +64,11 @@ class _VlcConfigurationGuideState extends State<VlcConfigurationGuide> {
       );
     }
 
-    if (_os == _OperatingSystem.macos) {
+    if (_os == OperatingSystem.macos) {
       return buildMacStepper();
     }
 
-    if (_os == _OperatingSystem.linux || _os == _OperatingSystem.windows) {
+    if (_os == OperatingSystem.linux || _os == OperatingSystem.windows) {
       return buildLinuxWindowsStepper();
     }
   }

@@ -12,6 +12,14 @@ var _videoExtensions = RegExp(
 var _audioExtensions = RegExp(
     r'\.(3ga|a52|aac|ac3|adt|adts|aif|aifc|aiff|alac|amr|aob|ape|awb|caf|dts|flac|it|m4a|m4b|m4p|mid|mka|mlp|mod|mpa|mp1|mp2|mp3|mpc|mpga|oga|ogg|oma|opus|ra|ram|rmi|s3m|spx|tta|voc|vqf|w64|wav|wma|wv|xa|xm)$');
 
+enum OperatingSystem { linux, macos, windows }
+
+Map<OperatingSystem, String> osNames = {
+  OperatingSystem.linux: 'Linux',
+  OperatingSystem.macos: 'macOS',
+  OperatingSystem.windows: 'Windows',
+};
+
 class BrowseItem {
   String type, name, path, uri;
 

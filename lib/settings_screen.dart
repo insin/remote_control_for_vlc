@@ -4,8 +4,10 @@ import 'dart:io';
 
 import 'package:connectivity/connectivity.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
+import 'host_ip_guide.dart';
 import 'models.dart';
 import 'widgets.dart';
 
@@ -219,19 +221,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   : null,
             ),
           ),
-        ),
-        ListTile(
-          dense: widget.settings.dense,
-          title: TextField(
-            controller: portController,
-            focusNode: portFocus,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              isDense: widget.settings.dense,
-              icon: Icon(Icons.input),
-              labelText: 'Port (default: 8080)',
-              errorText: portDirty ? connection.portError : null,
-            ),
+          trailing: IconButton(
+            onPressed: () {
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (context) => HostIpGuide()));
+            },
+            tooltip: 'Get help finding your IP',
+            icon: Icon(Icons.help, color: theme.primaryColor),
           ),
         ),
         ListTile(
@@ -256,6 +252,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
             tooltip: 'Toggle password visibility',
             icon: Icon(Icons.remove_red_eye,
                 color: showPassword ? theme.primaryColor : null),
+          ),
+        ),
+        ListTile(
+          dense: widget.settings.dense,
+          title: TextField(
+            controller: portController,
+            focusNode: portFocus,
+            keyboardType: TextInputType.number,
+            inputFormatters: [WhitelistingTextInputFormatter.digitsOnly],
+            decoration: InputDecoration(
+                isDense: widget.settings.dense,
+                icon: Icon(Icons.input),
+                labelText: 'Port (default: 8080)',
+                errorText: portDirty ? connection.portError : null,
+                helperText:
+                    'Advanced use only – most users should keep this at 8080'),
           ),
         ),
         ListTile(
