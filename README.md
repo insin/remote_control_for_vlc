@@ -77,3 +77,5 @@ If VLC Remote was able to successfully connect, the connection info will be save
 ### Settings
 
 ![](screenshots/settings.png)
+
+![](screenshots/host-ip-guide-os.png)
