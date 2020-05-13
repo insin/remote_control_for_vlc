@@ -13,6 +13,10 @@ The app's guides for initial VLC configuration and finding your host IP if it ca
 
 ### [VLC Remote Configuration Guides](https://codepen.io/jbscript/full/BaoVYYK)
 
+## Demo
+
+[![Demo of VLC Remote being used](https://img.youtube.com/vi/8eXJX4GVGhA/0.jpg)](https://www.youtube.com/watch?v=8eXJX4GVGhA)
+
 ## Screenshots
 
 ## Initial setup screens
