@@ -266,8 +266,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 icon: Icon(Icons.input),
                 labelText: 'Port (default: 8080)',
                 errorText: portDirty ? connection.portError : null,
-                helperText:
-                    'Advanced use only – most users should keep this at 8080'),
+                helperText: 'Advanced use only'),
           ),
         ),
         ListTile(
