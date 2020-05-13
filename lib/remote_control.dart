@@ -188,10 +188,14 @@ class _RemoteControlState extends State<RemoteControl> {
           .timeout(Duration(seconds: 1));
     } catch (e) {
       assert(() {
-        print('_serverRequest error: $e');
+        if (e is! TimeoutException) {
+          print('_serverRequest error: $e');
+        }
         return true;
       }());
+
       _resetPlaylist();
+
       setState(() {
         if (endpoint == 'status') {
           _lastStatusResponseCode = -1;
@@ -200,6 +204,7 @@ class _RemoteControlState extends State<RemoteControl> {
           _lastPlaylistResponseBody = null;
         }
       });
+
       return null;
     }
 
