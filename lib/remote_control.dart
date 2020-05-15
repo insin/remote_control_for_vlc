@@ -26,8 +26,6 @@ enum _PopupMenuChoice {
   FULLSCREEN,
   SUBTITLE_TRACK,
   RANDOM_PLAY,
-  REPEAT,
-  LOOP,
   EMPTY_PLAYLIST
 }
 
@@ -75,6 +73,12 @@ class _RemoteControlState extends State<RemoteControl> {
   Duration _time = Duration.zero;
   Duration _length = Duration.zero;
   int _volume = 256;
+  bool _repeat = false;
+  bool _loop = false;
+
+  /// Used to ignore loop/repeat status in any in-flight requests after we've
+  /// told VLC to change its looping.
+  DateTime _ignoreLoopStatusBefore;
   //#endregion
 
   //#region Playlist state
@@ -97,7 +101,7 @@ class _RemoteControlState extends State<RemoteControl> {
 
   /// Used to ignore volume status in any in-flight requests after we've told
   /// VLC to change the volume.
-  DateTime _ignoreVolumeUpdatesBefore;
+  DateTime _ignoreVolumeStatusBefore;
 
   /// Previous volume when the volume button was long-pressed to mute.
   int _preMuteVolume;
@@ -257,8 +261,8 @@ class _RemoteControlState extends State<RemoteControl> {
     // Volume changes aren't reflected in 'volume' command responses
     var ignoreVolumeUpdates = _draggingVolume ||
         queryParameters != null && queryParameters['command'] == 'volume' ||
-        _ignoreVolumeUpdatesBefore != null &&
-            requestTime.isBefore(_ignoreVolumeUpdatesBefore);
+        _ignoreVolumeStatusBefore != null &&
+            requestTime.isBefore(_ignoreVolumeStatusBefore);
 
     setState(() {
       if (!ignoreStateUpdates) {
@@ -300,6 +304,11 @@ class _RemoteControlState extends State<RemoteControl> {
         if (!_reusingBackgroundArt) {
           _backgroundArtUrl = _artUrlForPlid(statusResponse.currentPlId);
         }
+      }
+      if (_ignoreLoopStatusBefore == null ||
+          requestTime.isAfter(_ignoreLoopStatusBefore)) {
+        _loop = statusResponse.loop;
+        _repeat = statusResponse.repeat;
       }
       _lastStatusResponse = statusResponse;
     });
@@ -567,12 +576,6 @@ class _RemoteControlState extends State<RemoteControl> {
       case _PopupMenuChoice.RANDOM_PLAY:
         _toggleRandom();
         break;
-      case _PopupMenuChoice.REPEAT:
-        _toggleRepeat();
-        break;
-      case _PopupMenuChoice.LOOP:
-        _toggleLoop();
-        break;
       case _PopupMenuChoice.EMPTY_PLAYLIST:
         _emptyPlaylist();
         break;
@@ -640,14 +643,6 @@ class _RemoteControlState extends State<RemoteControl> {
     _statusCommand('pl_random');
   }
 
-  _toggleRepeat() {
-    _statusCommand('pl_repeat');
-  }
-
-  _toggleLoop() {
-    _statusCommand('pl_loop');
-  }
-
   _emptyPlaylist() {
     _statusCommand('pl_empty');
   }
@@ -660,7 +655,7 @@ class _RemoteControlState extends State<RemoteControl> {
       (percent * volumeSliderScaleFactor).round();
 
   _setVolumePercent(double percent, {bool finished = true}) {
-    _ignoreVolumeUpdatesBefore = DateTime.now();
+    _ignoreVolumeStatusBefore = DateTime.now();
     // Preempt the expected volume
     setState(() {
       _volume = _scaleVolumePercent(percent);
@@ -678,7 +673,7 @@ class _RemoteControlState extends State<RemoteControl> {
     // Nothing to do if already min or max
     if ((_volume <= 0 && relativeValue < 0) ||
         (_volume >= 512 && relativeValue > 0)) return;
-    _ignoreVolumeUpdatesBefore = DateTime.now();
+    _ignoreVolumeStatusBefore = DateTime.now();
     // Preempt the expected volume
     setState(() {
       _volume = (_volume + relativeValue).clamp(0, 512);
@@ -754,6 +749,28 @@ class _RemoteControlState extends State<RemoteControl> {
   //#endregion
 
   //#region Media controls
+  _toggleLooping() {
+    _ignoreLoopStatusBefore = DateTime.now();
+    if (_repeat == false && _loop == false) {
+      _statusCommand('pl_loop');
+      setState(() {
+        _loop = true;
+      });
+    } else if (_loop == true) {
+      _statusCommand('pl_repeat');
+      setState(() {
+        _loop = false;
+        _repeat = true;
+      });
+    } else if (_repeat == true) {
+      _statusCommand('pl_repeat');
+      setState(() {
+        _loop = false;
+        _repeat = false;
+      });
+    }
+  }
+
   _stop() {
     _statusCommand('pl_stop');
   }
@@ -871,18 +888,6 @@ class _RemoteControlState extends State<RemoteControl> {
                               child: Text('Turn random play '
                                   '${_lastStatusResponse.random ? 'OFF' : 'ON'}'),
                               value: _PopupMenuChoice.RANDOM_PLAY,
-                              enabled: _lastStatusResponse != null,
-                            ),
-                            PopupMenuItem(
-                              child: Text('Turn repeat '
-                                  '${_lastStatusResponse.repeat ? 'OFF' : 'ON'}'),
-                              value: _PopupMenuChoice.REPEAT,
-                              enabled: _lastStatusResponse != null,
-                            ),
-                            PopupMenuItem(
-                              child: Text('Turn looping '
-                                  '${_lastStatusResponse.loop ? 'OFF' : 'ON'}'),
-                              value: _PopupMenuChoice.LOOP,
                               enabled: _lastStatusResponse != null,
                             ),
                             PopupMenuItem(
@@ -1330,10 +1335,13 @@ class _RemoteControlState extends State<RemoteControl> {
                 children: <Widget>[
                   GestureDetector(
                     child: Icon(
-                      Icons.stop,
+                      _repeat ? Icons.repeat_one : Icons.repeat,
+                      color: _repeat || _loop
+                          ? theme.primaryColor
+                          : theme.disabledColor,
                       size: 30,
                     ),
-                    onTap: _stop,
+                    onTap: _toggleLooping,
                   ),
                   Expanded(child: VerticalDivider()),
                   GestureDetector(
@@ -1359,6 +1367,7 @@ class _RemoteControlState extends State<RemoteControl> {
                     padding: EdgeInsets.symmetric(horizontal: 10),
                     child: GestureDetector(
                       onTap: _pause,
+                      onLongPress: _stop,
                       child: TweenAnimationBuilder(
                         tween: Tween<double>(
                             begin: 0.0,
