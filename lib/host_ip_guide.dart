@@ -35,6 +35,7 @@ class _HostIpGuideState extends State<HostIpGuide> {
     );
   }
 
+  // ignore: missing_return
   Widget buildBody() {
     var theme = Theme.of(context);
     if (_os == null) {

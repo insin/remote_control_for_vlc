@@ -36,6 +36,7 @@ class _VlcConfigurationGuideState extends State<VlcConfigurationGuide> {
     );
   }
 
+  // ignore: missing_return
   Widget buildBody() {
     var theme = Theme.of(context);
     if (_os == null) {
