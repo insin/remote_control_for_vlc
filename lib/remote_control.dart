@@ -4,6 +4,8 @@ import 'dart:ui';
 
 import 'package:connectivity/connectivity.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:http/http.dart' as http;
 import 'package:just_throttle_it/just_throttle_it.dart';
 import 'package:ping_discover_network/ping_discover_network.dart';
@@ -25,7 +27,6 @@ enum _PopupMenuChoice {
   AUDIO_TRACK,
   FULLSCREEN,
   SUBTITLE_TRACK,
-  RANDOM_PLAY,
   EMPTY_PLAYLIST
 }
 
@@ -75,17 +76,21 @@ class _RemoteControlState extends State<RemoteControl> {
   int _volume = 256;
   bool _repeat = false;
   bool _loop = false;
+  bool _random = false;
 
-  /// Used to ignore loop/repeat status in any in-flight requests after we've
-  /// told VLC to change its looping.
+  /// Used to ignore status in any in-flight requests after we've told VLC to
+  /// toggle playback settings.
   DateTime _ignoreLoopStatusBefore;
+  DateTime _ignoreRandomStatusBefore;
   //#endregion
 
   //#region Playlist state
+  ScrollController _scrollController = ScrollController();
   List<PlaylistItem> _playlist = [];
   PlaylistItem _playing;
   String _backgroundArtUrl;
   bool _reusingBackgroundArt = false;
+  bool _showAddMediaButton = true;
   //#endregion
 
   //#region Volume state
@@ -124,6 +129,7 @@ class _RemoteControlState extends State<RemoteControl> {
     _pollingTicker =
         Timer.periodic(Duration(seconds: _tickIntervalSeconds), _tick);
     super.initState();
+    _scrollController.addListener(_handleScroll);
     _checkWifi();
   }
 
@@ -310,6 +316,10 @@ class _RemoteControlState extends State<RemoteControl> {
         _loop = statusResponse.loop;
         _repeat = statusResponse.repeat;
       }
+      if (_ignoreRandomStatusBefore == null ||
+          requestTime.isAfter(_ignoreRandomStatusBefore)) {
+        _random = statusResponse.random;
+      }
       _lastStatusResponse = statusResponse;
     });
   }
@@ -330,6 +340,11 @@ class _RemoteControlState extends State<RemoteControl> {
         _title = '';
         _backgroundArtUrl = '';
         _reusingBackgroundArt = false;
+      }
+      if (playlistResponse.items.length < _playlist.length) {
+        SchedulerBinding.instance.addPostFrameCallback((timeStamp) {
+          _showAddMediaButtonIfNotScrollable();
+        });
       }
       _playlist = playlistResponse.items;
       _playing = playlistResponse.currentItem;
@@ -529,6 +544,7 @@ class _RemoteControlState extends State<RemoteControl> {
     _reusingBackgroundArt = false;
     _playlist = [];
     _title = '';
+    _showAddMediaButton = true;
   }
 
   _deletePlaylistItem(PlaylistItem item) {
@@ -572,9 +588,6 @@ class _RemoteControlState extends State<RemoteControl> {
         break;
       case _PopupMenuChoice.SUBTITLE_TRACK:
         _chooseSubtitleTrack();
-        break;
-      case _PopupMenuChoice.RANDOM_PLAY:
-        _toggleRandom();
         break;
       case _PopupMenuChoice.EMPTY_PLAYLIST:
         _emptyPlaylist();
@@ -639,12 +652,52 @@ class _RemoteControlState extends State<RemoteControl> {
     _statusCommand('fullscreen');
   }
 
-  _toggleRandom() {
-    _statusCommand('pl_random');
-  }
-
   _emptyPlaylist() {
     _statusCommand('pl_empty');
+  }
+  //#endregion
+
+  //#region Playlist
+  bool get _showFab =>
+      _lastStatusResponseCode == 200 &&
+      _showAddMediaButton &&
+      !_showVolumeControls &&
+      !_animatingVolumeControls;
+
+  /// Ensures the add media button is displayed if it's currently hidden and the
+  /// playlist contents become non-scrollable.
+  _showAddMediaButtonIfNotScrollable() {
+    if (!_showAddMediaButton &&
+        _scrollController?.position?.maxScrollExtent == 0.0) {
+      setState(() {
+        _showAddMediaButton = true;
+      });
+    }
+  }
+
+  /// Hides the add media button when scrolling down and re-displays it when
+  /// scrolling back up again.
+  _handleScroll() {
+    switch (_scrollController.position.userScrollDirection) {
+      case ScrollDirection.forward:
+        if (_scrollController.position.maxScrollExtent !=
+            _scrollController.position.minScrollExtent) {
+          setState(() {
+            _showAddMediaButton = true;
+          });
+        }
+        break;
+      case ScrollDirection.reverse:
+        if (_scrollController.position.maxScrollExtent !=
+            _scrollController.position.minScrollExtent) {
+          setState(() {
+            _showAddMediaButton = false;
+          });
+        }
+        break;
+      case ScrollDirection.idle:
+        break;
+    }
   }
   //#endregion
 
@@ -771,6 +824,14 @@ class _RemoteControlState extends State<RemoteControl> {
     }
   }
 
+  _toggleRandom() {
+    _ignoreRandomStatusBefore = DateTime.now();
+    _statusCommand('pl_random');
+    setState(() {
+      _random = !_random;
+    });
+  }
+
   _stop() {
     _statusCommand('pl_stop');
   }
@@ -882,12 +943,6 @@ class _RemoteControlState extends State<RemoteControl> {
                               child: Text('Turn fullscreen '
                                   '${_lastStatusResponse.fullscreen ? 'OFF' : 'ON'}'),
                               value: _PopupMenuChoice.FULLSCREEN,
-                              enabled: _lastStatusResponse != null,
-                            ),
-                            PopupMenuItem(
-                              child: Text('Turn random play '
-                                  '${_lastStatusResponse.random ? 'OFF' : 'ON'}'),
-                              value: _PopupMenuChoice.RANDOM_PLAY,
                               enabled: _lastStatusResponse != null,
                             ),
                             PopupMenuItem(
@@ -1021,24 +1076,6 @@ class _RemoteControlState extends State<RemoteControl> {
       );
     }
 
-    if (_playlist.isEmpty) {
-      return Expanded(
-        child: Padding(
-          padding: EdgeInsets.all(32),
-          child: _lastPlaylistResponseCode == 200
-              ? Stack(alignment: AlignmentDirectional.center, children: [
-                  Image.asset('assets/icon-512.png'),
-                  Positioned(
-                    bottom: 0,
-                    child: Text(
-                        'Connected to VLC ${_lastStatusResponse?.version ?? ''}'),
-                  )
-                ])
-              : ConnectionAnimation(),
-        ),
-      );
-    }
-
     return Expanded(
       child: Stack(
         children: [
@@ -1059,56 +1096,102 @@ class _RemoteControlState extends State<RemoteControl> {
                 ),
               ),
             ),
-          ListView.builder(
-            itemCount: _playlist.length,
-            itemBuilder: (context, index) {
-              var item = _playlist[index];
-              var icon = item.icon;
-              if (item.current) {
-                switch (_state) {
-                  case 'stopped':
-                    icon = Icons.stop;
-                    break;
-                  case 'paused':
-                    icon = Icons.pause;
-                    break;
-                  case 'playing':
-                    icon = Icons.play_arrow;
-                    break;
-                }
-              }
-              return ListTile(
-                dense: widget.settings.dense,
-                selected: item.current,
-                leading: Icon(icon),
-                title: Text(
-                  item.title,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight:
-                        item.current ? FontWeight.bold : FontWeight.normal,
-                  ),
-                ),
-                subtitle:
-                    item.current && _artist.isNotEmpty ? Text(_artist) : null,
-                trailing: !item.duration.isNegative
-                    ? Text(formatTime(item.duration),
-                        style: item.current
-                            ? TextStyle(color: theme.primaryColor)
-                            : null)
-                    : null,
-                onTap: () {
-                  if (item.current) {
-                    _pause();
-                  } else {
-                    _play(item);
+          Scrollbar(
+            child: ListView.builder(
+              controller: _scrollController,
+              itemCount: _playlist.length,
+              itemBuilder: (context, index) {
+                var item = _playlist[index];
+                var icon = item.icon;
+                if (item.current) {
+                  switch (_state) {
+                    case 'stopped':
+                      icon = Icons.stop;
+                      break;
+                    case 'paused':
+                      icon = Icons.pause;
+                      break;
+                    case 'playing':
+                      icon = Icons.play_arrow;
+                      break;
                   }
-                },
-                onLongPress: () {
-                  _deletePlaylistItem(item);
-                },
-              );
-            },
+                }
+                return ListTile(
+                  dense: widget.settings.dense,
+                  selected: item.current,
+                  leading: Icon(icon),
+                  title: Text(
+                    item.title,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight:
+                          item.current ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  subtitle:
+                      item.current && _artist.isNotEmpty ? Text(_artist) : null,
+                  trailing: !item.duration.isNegative
+                      ? Text(formatTime(item.duration),
+                          style: item.current
+                              ? TextStyle(color: theme.primaryColor)
+                              : null)
+                      : null,
+                  onTap: () {
+                    if (item.current) {
+                      _pause();
+                    } else {
+                      _play(item);
+                    }
+                  },
+                  onLongPress: () {
+                    _deletePlaylistItem(item);
+                  },
+                );
+              },
+            ),
+          ),
+          if (_playlist.isEmpty)
+            Positioned.fill(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: _lastPlaylistResponseCode == 200
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            FractionallySizedBox(
+                              widthFactor: 0.75,
+                              child: Image.asset('assets/icon-512.png'),
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                                'Connected to VLC ${_lastStatusResponse?.version ?? ''}'),
+                          ],
+                        ),
+                      )
+                    : ConnectionAnimation(),
+              ),
+            ),
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: TweenAnimationBuilder(
+              tween: Tween<double>(begin: 0, end: _showFab ? 1 : 0),
+              duration: Duration(milliseconds: 250),
+              curve: _showFab ? Curves.easeOut : Curves.easeIn,
+              builder: (context, scale, child) => ScaleTransition(
+                scale: AlwaysStoppedAnimation<double>(scale),
+                child: FloatingActionButton(
+                  child: IconButton(
+                    icon: Icon(
+                      Icons.eject,
+                      color: Colors.white,
+                    ),
+                  ),
+                  onPressed: _openMedia,
+                ),
+              ),
+            ),
           ),
           Positioned.fill(
             child: Column(
@@ -1405,10 +1488,11 @@ class _RemoteControlState extends State<RemoteControl> {
                   Expanded(child: VerticalDivider()),
                   GestureDetector(
                     child: Icon(
-                      Icons.eject,
+                      Icons.shuffle,
+                      color: _random ? theme.primaryColor : theme.disabledColor,
                       size: 30,
                     ),
-                    onTap: _openMedia,
+                    onTap: _toggleRandom,
                   ),
                 ],
               ),
@@ -1451,23 +1535,34 @@ class _ConnectionAnimationState extends State<ConnectionAnimation>
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      alignment: AlignmentDirectional.center,
-      children: <Widget>[
-        Image.asset('assets/cone.png'),
-        AnimatedBuilder(
-          animation: _animation,
-          builder: (BuildContext context, Widget child) {
-            return Image.asset(
-              'assets/signal-${_animation.value}.png',
-            );
-          },
-        ),
-        Positioned(
-          bottom: 0,
-          child: Text('Trying to connect to VLC…'),
-        )
-      ],
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
+            alignment: AlignmentDirectional.center,
+            children: <Widget>[
+              FractionallySizedBox(
+                widthFactor: 0.75,
+                child: Image.asset('assets/cone.png'),
+              ),
+              AnimatedBuilder(
+                animation: _animation,
+                builder: (BuildContext context, Widget child) {
+                  return FractionallySizedBox(
+                    widthFactor: 0.75,
+                    child: Image.asset(
+                      'assets/signal-${_animation.value}.png',
+                    ),
+                  );
+                },
+              )
+            ],
+          ),
+          SizedBox(height: 16),
+          Text('Trying to connect to VLC…'),
+        ],
+      ),
     );
   }
 }
