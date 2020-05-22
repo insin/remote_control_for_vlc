@@ -756,6 +756,20 @@ class _RemoteControlState extends State<RemoteControl> {
     }
   }
 
+  _toggleMute() {
+    if (_volume > 0) {
+      _preMuteVolume = _volume;
+      _setVolumePercent(0);
+    } else {
+      _setVolumePercent(_preMuteVolume != null
+          ? _preMuteVolume / volumeSliderScaleFactor
+          : 100);
+    }
+    if (_showVolumeControls) {
+      _scheduleHidingVolumeControls(2);
+    }
+  }
+
   _cancelHidingVolumeControls() {
     if (_hideVolumeControlsTimer != null && _hideVolumeControlsTimer.isActive) {
       _hideVolumeControlsTimer.cancel();
@@ -1389,16 +1403,7 @@ class _RemoteControlState extends State<RemoteControl> {
                   Builder(
                     builder: (context) => GestureDetector(
                       onTap: _toggleVolumeControls,
-                      onLongPress: () {
-                        if (_volume > 0) {
-                          _preMuteVolume = _volume;
-                          _setVolumePercent(0);
-                        } else {
-                          _setVolumePercent(_preMuteVolume != null
-                              ? _preMuteVolume / volumeSliderScaleFactor
-                              : 100);
-                        }
-                      },
+                      onLongPress: _toggleMute,
                       child: Icon(_volume == 0
                           ? Icons.volume_off
                           : _volume < 102
