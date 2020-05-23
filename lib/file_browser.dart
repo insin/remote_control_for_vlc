@@ -190,29 +190,33 @@ class _FileBrowserState extends State<FileBrowser> {
       );
     }
 
-    return ListView.separated(
-      itemCount: _items.length,
-      itemBuilder: (context, i) {
-        var item = _items[i];
-        return EnqueueMenuGestureDetector(
-          item: item,
-          child: ListTile(
-            dense: widget.settings.dense,
-            leading: Icon(item.icon),
-            title: Text(item.title),
-            enabled: !_loading,
-            onTap: () {
-              _handleTap(item);
-            },
-          ),
-        );
-      },
-      separatorBuilder: (context, i) {
-        if (_items[i].isDir && i < _items.length - 1 && _items[i + 1].isFile) {
-          return Divider();
-        }
-        return SizedBox.shrink();
-      },
+    return Scrollbar(
+      child: ListView.separated(
+        itemCount: _items.length,
+        itemBuilder: (context, i) {
+          var item = _items[i];
+          return EnqueueMenuGestureDetector(
+            item: item,
+            child: ListTile(
+              dense: widget.settings.dense,
+              leading: Icon(item.icon),
+              title: Text(item.title),
+              enabled: !_loading,
+              onTap: () {
+                _handleTap(item);
+              },
+            ),
+          );
+        },
+        separatorBuilder: (context, i) {
+          if (_items[i].isDir &&
+              i < _items.length - 1 &&
+              _items[i + 1].isFile) {
+            return Divider();
+          }
+          return SizedBox.shrink();
+        },
+      ),
     );
   }
 }
