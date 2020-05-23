@@ -15,16 +15,16 @@ String _decibelsToString(double db) {
 }
 
 class EqualizerScreen extends StatefulWidget {
-  final Equalizer state;
-  final Stream<Equalizer> states;
+  final Equalizer equalizer;
+  final Stream<Equalizer> equalizerStream;
   final Function(bool enabled) onToggleEnabled;
   final Function(int presetId) onPresetChange;
   final Function(String db) onPreampChange;
   final Function(int bandId, String db) onBandChange;
 
   EqualizerScreen({
-    this.state,
-    this.states,
+    this.equalizer,
+    this.equalizerStream,
     this.onToggleEnabled,
     this.onPresetChange,
     this.onPreampChange,
@@ -36,21 +36,21 @@ class EqualizerScreen extends StatefulWidget {
 }
 
 class _EqualizerScreenState extends State<EqualizerScreen> {
-  Equalizer _state;
-  StreamSubscription _statesSubscription;
+  Equalizer _equalizer;
+  StreamSubscription _equalizerSubscription;
   Preset _preset;
   double _preamp;
 
   @override
   void initState() {
-    _state = widget.state;
-    _statesSubscription = widget.states.listen(_onLatestState);
+    _equalizer = widget.equalizer;
+    _equalizerSubscription = widget.equalizerStream.listen(_onLatestState);
     super.initState();
   }
 
   @override
   void dispose() {
-    _statesSubscription.cancel();
+    _equalizerSubscription.cancel();
     super.dispose();
   }
 
@@ -59,7 +59,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
       context: context,
       builder: (context) => SimpleDialog(
         title: Text('Preset'),
-        children: _state.presets
+        children: _equalizer.presets
             .map((preset) => SimpleDialogOption(
                   child: Text(preset.name),
                   onPressed: () {
@@ -84,15 +84,15 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
     }
     this.setState(() {
       if (_preamp != null &&
-          _decibelsToString(_state.preamp) != _decibelsToString(_preamp) &&
+          _decibelsToString(_equalizer.preamp) != _decibelsToString(_preamp) &&
           _decibelsToString(newState.preamp) == _decibelsToString(_preamp)) {
         _preamp = null;
       }
-      _state = newState;
+      _equalizer = newState;
     });
   }
 
-  String get _preampLabel => _decibelsToString(_preamp ?? _state.preamp);
+  String get _preampLabel => _decibelsToString(_preamp ?? _equalizer.preamp);
 
   @override
   Widget build(BuildContext context) {
@@ -103,10 +103,10 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
       body: ListView(children: [
         SwitchListTile(
           title: Text('Enable'),
-          value: _state.enabled,
+          value: _equalizer.enabled,
           onChanged: widget.onToggleEnabled,
         ),
-        if (_state.enabled)
+        if (_equalizer.enabled)
           Column(children: [
             ListTile(
               title: Text('Preset'),
@@ -122,7 +122,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
                 child: Slider(
                   max: 20,
                   min: -20,
-                  value: _preamp ?? _state.preamp,
+                  value: _preamp ?? _equalizer.preamp,
                   onChanged: (db) {
                     setState(() {
                       _preamp = db;
@@ -145,23 +145,23 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
             Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
               _VerticalBandSlider(
                   label: '60 Hz',
-                  band: _state.bands[0],
+                  band: _equalizer.bands[0],
                   onBandChange: widget.onBandChange),
               _VerticalBandSlider(
                   label: '170 Hz',
-                  band: _state.bands[1],
+                  band: _equalizer.bands[1],
                   onBandChange: widget.onBandChange),
               _VerticalBandSlider(
                   label: '310 Hz',
-                  band: _state.bands[2],
+                  band: _equalizer.bands[2],
                   onBandChange: widget.onBandChange),
               _VerticalBandSlider(
                   label: '600 Hz',
-                  band: _state.bands[3],
+                  band: _equalizer.bands[3],
                   onBandChange: widget.onBandChange),
               _VerticalBandSlider(
                   label: '1 KHz',
-                  band: _state.bands[4],
+                  band: _equalizer.bands[4],
                   onBandChange: widget.onBandChange),
             ]),
             ListTile(
@@ -170,26 +170,26 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
             Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
               _VerticalBandSlider(
                   label: '3 KHz',
-                  band: _state.bands[5],
+                  band: _equalizer.bands[5],
                   onBandChange: widget.onBandChange),
               _VerticalBandSlider(
                   label: '6 KHz',
-                  band: _state.bands[6],
+                  band: _equalizer.bands[6],
                   onBandChange: widget.onBandChange),
               _VerticalBandSlider(
                   label: '12 KHz',
-                  band: _state.bands[7],
+                  band: _equalizer.bands[7],
                   onBandChange: widget.onBandChange),
               _VerticalBandSlider(
                   label: '14 KHz',
-                  band: _state.bands[8],
+                  band: _equalizer.bands[8],
                   onBandChange: widget.onBandChange),
               _VerticalBandSlider(
                   label: '16 KHz',
-                  band: _state.bands[9],
+                  band: _equalizer.bands[9],
                   onBandChange: widget.onBandChange),
             ]),
-            SizedBox(height: 32)
+            SizedBox(height: 24)
           ]),
       ]),
     );

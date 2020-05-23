@@ -28,8 +28,8 @@ const _volumeSlidingThrottleMilliseconds = 333;
 enum _PopupMenuChoice {
   AUDIO_TRACK,
   EMPTY_PLAYLIST,
-  EQUALIZER,
   FULLSCREEN,
+  SETTINGS,
   SUBTITLE_TRACK
 }
 
@@ -70,7 +70,7 @@ class _RemoteControlState extends State<RemoteControl> {
   /// Contains subtitle and audio track information for use in the menu.
   VlcStatusResponse _lastStatusResponse;
 
-  /// Used to stream status updates to the EqualizerScreen when it's open.
+  /// Used to send equalizer changes to EqualizerScreen when it's open.
   StreamController<Equalizer> _equalizerController =
       StreamController<Equalizer>.broadcast();
 
@@ -84,6 +84,7 @@ class _RemoteControlState extends State<RemoteControl> {
   bool _repeat = false;
   bool _loop = false;
   bool _random = false;
+  Equalizer _equalizer;
 
   /// Used to ignore status in any in-flight requests after we've told VLC to
   /// toggle playback settings.
@@ -330,7 +331,8 @@ class _RemoteControlState extends State<RemoteControl> {
           requestTime.isAfter(_ignoreRandomStatusBefore)) {
         _random = statusResponse.random;
       }
-      _equalizerController.add(statusResponse.equalizer);
+      _equalizer = statusResponse.equalizer;
+      _equalizerController.add(_equalizer);
       _lastStatusResponse = statusResponse;
     });
   }
@@ -597,11 +599,11 @@ class _RemoteControlState extends State<RemoteControl> {
       case _PopupMenuChoice.EMPTY_PLAYLIST:
         _emptyPlaylist();
         break;
-      case _PopupMenuChoice.EQUALIZER:
-        _showEqualizer();
-        break;
       case _PopupMenuChoice.FULLSCREEN:
         _toggleFullScreen();
+        break;
+      case _PopupMenuChoice.SETTINGS:
+        _showSettings();
         break;
       case _PopupMenuChoice.SUBTITLE_TRACK:
         _chooseSubtitleTrack();
@@ -662,13 +664,21 @@ class _RemoteControlState extends State<RemoteControl> {
     }
   }
 
+  _toggleEqualizer() {
+    _statusRequest({
+      'command': 'enableeq',
+      'val': _equalizer?.enabled == true ? '0' : '1'
+    });
+    _scheduleSingleUpdate();
+  }
+
   _showEqualizer() {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => EqualizerScreen(
-          state: _lastStatusResponse.equalizer,
-          states: _equalizerController.stream,
+          equalizer: _equalizer,
+          equalizerStream: _equalizerController.stream,
           onToggleEnabled: (enabled) {
             _statusRequest({'command': 'enableeq', 'val': enabled ? '1' : '0'});
             _scheduleSingleUpdate();
@@ -943,6 +953,7 @@ class _RemoteControlState extends State<RemoteControl> {
 
   @override
   Widget build(BuildContext context) {
+    var theme = Theme.of(context);
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -972,10 +983,15 @@ class _RemoteControlState extends State<RemoteControl> {
                         tooltip: 'Refresh VLC status',
                       ),
                     ),
-                    IconButton(
-                      icon: Icon(Icons.settings),
-                      tooltip: 'Show settings',
-                      onPressed: _showSettings,
+                    GestureDetector(
+                      onLongPress: _toggleEqualizer,
+                      child: IconButton(
+                        color: _equalizer?.enabled == true
+                            ? theme.primaryColor
+                            : null,
+                        icon: Icon(Icons.equalizer),
+                        onPressed: _showEqualizer,
+                      ),
                     ),
                     Visibility(
                       visible: _lastStatusResponseCode == 200,
@@ -984,32 +1000,66 @@ class _RemoteControlState extends State<RemoteControl> {
                         itemBuilder: (context) {
                           return [
                             PopupMenuItem(
-                              child: Text('Select subtitle track'),
+                              child: ListTile(
+                                dense: widget.settings.dense,
+                                leading: Icon(Icons.subtitles),
+                                title: Text('Subtitle track'),
+                                enabled:
+                                    (_lastStatusResponse?.subtitleTracks ?? [])
+                                        .isNotEmpty,
+                              ),
                               value: _PopupMenuChoice.SUBTITLE_TRACK,
                               enabled:
                                   (_lastStatusResponse?.subtitleTracks ?? [])
                                       .isNotEmpty,
                             ),
                             PopupMenuItem(
-                              child: Text('Select audio track'),
+                              child: ListTile(
+                                dense: widget.settings.dense,
+                                leading: Icon(Icons.audiotrack),
+                                title: Text('Audio track'),
+                                enabled:
+                                    (_lastStatusResponse?.audioTracks ?? [])
+                                            .length >
+                                        1,
+                              ),
                               value: _PopupMenuChoice.AUDIO_TRACK,
                               enabled: (_lastStatusResponse?.audioTracks ?? [])
-                                  .isNotEmpty,
+                                      .length >
+                                  1,
                             ),
                             PopupMenuItem(
-                              child: Text(intl('Equalizer')),
-                              value: _PopupMenuChoice.EQUALIZER,
-                              enabled: _lastStatusResponse != null,
-                            ),
-                            PopupMenuItem(
-                              child: Text('Turn fullscreen '
-                                  '${_lastStatusResponse.fullscreen ? 'OFF' : 'ON'}'),
+                              child: ListTile(
+                                dense: widget.settings.dense,
+                                leading: Icon(Icons.fullscreen,
+                                    color: _lastStatusResponse.fullscreen
+                                        ? theme.primaryColor
+                                        : null),
+                                title: Text('Fullscreen'),
+                                enabled: _playing != null &&
+                                    (_playing.isVideo || _playing.isWeb),
+                              ),
                               value: _PopupMenuChoice.FULLSCREEN,
-                              enabled: _lastStatusResponse != null,
+                              enabled: _playing != null &&
+                                  (_playing.isVideo || _playing.isWeb),
                             ),
                             PopupMenuItem(
-                              child: Text('Clear playlist'),
+                              child: ListTile(
+                                dense: widget.settings.dense,
+                                leading: Icon(Icons.clear),
+                                title: Text('Clear playlist'),
+                              ),
                               value: _PopupMenuChoice.EMPTY_PLAYLIST,
+                              enabled: _lastStatusResponse != null,
+                            ),
+                            PopupMenuDivider(),
+                            PopupMenuItem(
+                              child: ListTile(
+                                dense: widget.settings.dense,
+                                leading: Icon(Icons.settings),
+                                title: Text(intl('Settings')),
+                              ),
+                              value: _PopupMenuChoice.SETTINGS,
                               enabled: _lastStatusResponse != null,
                             ),
                           ];
