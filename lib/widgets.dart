@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -52,6 +54,37 @@ class _EnqueueMenuGestureDetectorState
       child: widget.child,
     );
   }
+}
+
+/// A custom track shape for a [Slider] which lets it go full-width.
+///
+/// From https://github.com/flutter/flutter/issues/37057#issuecomment-516048356
+class FullWidthTrackShape extends RoundedRectSliderTrackShape {
+  Rect getPreferredRect({
+    @required RenderBox parentBox,
+    Offset offset = Offset.zero,
+    @required SliderThemeData sliderTheme,
+    bool isEnabled = false,
+    bool isDiscrete = false,
+  }) {
+    final double trackHeight = sliderTheme.trackHeight;
+    final double trackLeft = offset.dx;
+    final double trackTop =
+        offset.dy + (parentBox.size.height - trackHeight) / 2;
+    final double trackWidth = parentBox.size.width;
+    return Rect.fromLTWH(trackLeft, trackTop, trackWidth, trackHeight);
+  }
+}
+
+var _intlStrings = {
+  'Equalizer': 'Equaliser',
+};
+
+String intl(String enUsString) {
+  if (ui.window.locale.countryCode == 'US') {
+    return enUsString;
+  }
+  return _intlStrings[enUsString];
 }
 
 /// Like [Iterable.join] but for lists of Widgets.

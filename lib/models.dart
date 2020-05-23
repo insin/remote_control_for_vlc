@@ -215,6 +215,27 @@ class LanguageTrack {
   }
 }
 
+class Equalizer {
+  bool enabled;
+  List<Preset> presets;
+  List<Band> bands;
+  double preamp;
+}
+
+class Band {
+  int id;
+  double value;
+
+  Band(this.id, this.value);
+}
+
+class Preset {
+  int id;
+  String name;
+
+  Preset(this.id, this.name);
+}
+
 class VlcStatusResponse {
   xml.XmlDocument document;
   List<LanguageTrack> _audioTracks;
@@ -283,6 +304,33 @@ class VlcStatusResponse {
       _subtitleTracks = _getLanguageTracks('Subtitle');
     }
     return _subtitleTracks;
+  }
+
+  Equalizer get equalizer {
+    var equalizer = Equalizer();
+    var el = document.rootElement.findElements('equalizer').first;
+    equalizer.enabled = el.firstChild != null;
+    if (!equalizer.enabled) {
+      return equalizer;
+    }
+    equalizer.presets = el
+        .findAllElements('preset')
+        .map((el) => Preset(
+              int.parse(el.getAttribute('id')),
+              el.text,
+            ))
+        .toList();
+    equalizer.presets.sort((a, b) => a.id - b.id);
+    equalizer.bands = el
+        .findAllElements('band')
+        .map((el) => Band(
+              int.parse(el.getAttribute('id')),
+              double.parse(el.text),
+            ))
+        .toList();
+    equalizer.bands.sort((a, b) => a.id - b.id);
+    equalizer.preamp = double.parse(el.findElements('preamp').first.text);
+    return equalizer;
   }
 
   List<LanguageTrack> _getLanguageTracks(String type) {

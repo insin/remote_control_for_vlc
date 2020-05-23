@@ -13,11 +13,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:transparent_image/transparent_image.dart';
 import 'package:xml/xml.dart' as xml;
 
+import 'equalizer_screen.dart';
 import 'models.dart';
 import 'open_media.dart';
 import 'settings_screen.dart';
 import 'utils.dart';
 import 'vlc_configuration_guide.dart';
+import 'widgets.dart';
 
 var _headerFooterBgColor = Color.fromRGBO(241, 241, 241, 1.0);
 const _tickIntervalSeconds = 1;
@@ -25,9 +27,10 @@ const _volumeSlidingThrottleMilliseconds = 333;
 
 enum _PopupMenuChoice {
   AUDIO_TRACK,
+  EMPTY_PLAYLIST,
+  EQUALIZER,
   FULLSCREEN,
-  SUBTITLE_TRACK,
-  EMPTY_PLAYLIST
+  SUBTITLE_TRACK
 }
 
 class RemoteControl extends StatefulWidget {
@@ -66,6 +69,10 @@ class _RemoteControlState extends State<RemoteControl> {
   //#region VLC status state
   /// Contains subtitle and audio track information for use in the menu.
   VlcStatusResponse _lastStatusResponse;
+
+  /// Used to stream status updates to the EqualizerScreen when it's open.
+  StreamController<Equalizer> _equalizerController =
+      StreamController<Equalizer>.broadcast();
 
   // Fields populated from the latest VLC status response
   String _state = 'stopped';
@@ -249,12 +256,15 @@ class _RemoteControlState extends State<RemoteControl> {
     var requestTime = DateTime.now();
     xml.XmlDocument document = await _serverRequest('status', queryParameters);
     if (document == null) {
+      _equalizerController.add(null);
       return;
     }
 
     var statusResponse = VlcStatusResponse(document);
     assert(() {
-      //print('VlcStatusRequest(${queryParameters ?? {}}) => $statusResponse');
+      if (queryParameters != null) {
+        print('VlcStatusRequest(${queryParameters ?? {}}) => $statusResponse');
+      }
       return true;
     }());
 
@@ -320,6 +330,7 @@ class _RemoteControlState extends State<RemoteControl> {
           requestTime.isAfter(_ignoreRandomStatusBefore)) {
         _random = statusResponse.random;
       }
+      _equalizerController.add(statusResponse.equalizer);
       _lastStatusResponse = statusResponse;
     });
   }
@@ -583,14 +594,17 @@ class _RemoteControlState extends State<RemoteControl> {
       case _PopupMenuChoice.AUDIO_TRACK:
         _chooseAudioTrack();
         break;
+      case _PopupMenuChoice.EMPTY_PLAYLIST:
+        _emptyPlaylist();
+        break;
+      case _PopupMenuChoice.EQUALIZER:
+        _showEqualizer();
+        break;
       case _PopupMenuChoice.FULLSCREEN:
         _toggleFullScreen();
         break;
       case _PopupMenuChoice.SUBTITLE_TRACK:
         _chooseSubtitleTrack();
-        break;
-      case _PopupMenuChoice.EMPTY_PLAYLIST:
-        _emptyPlaylist();
         break;
     }
   }
@@ -646,6 +660,35 @@ class _RemoteControlState extends State<RemoteControl> {
         'val': audioTrack.streamNumber.toString(),
       });
     }
+  }
+
+  _showEqualizer() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EqualizerScreen(
+          state: _lastStatusResponse.equalizer,
+          states: _equalizerController.stream,
+          onToggleEnabled: (enabled) {
+            _statusRequest({'command': 'enableeq', 'val': enabled ? '1' : '0'});
+            _scheduleSingleUpdate();
+          },
+          onPresetChange: (presetId) {
+            _statusRequest({'command': 'setpreset', 'val': '$presetId'});
+            _scheduleSingleUpdate();
+          },
+          onPreampChange: (value) {
+            _statusRequest({'command': 'preamp', 'val': '$value'});
+            _scheduleSingleUpdate();
+          },
+          onBandChange: (bandId, value) {
+            _statusRequest(
+                {'command': 'equalizer', 'band': '$bandId', 'val': value});
+            _scheduleSingleUpdate();
+          },
+        ),
+      ),
+    );
   }
 
   _toggleFullScreen() {
@@ -954,6 +997,11 @@ class _RemoteControlState extends State<RemoteControl> {
                                   .isNotEmpty,
                             ),
                             PopupMenuItem(
+                              child: Text(intl('Equalizer')),
+                              value: _PopupMenuChoice.EQUALIZER,
+                              enabled: _lastStatusResponse != null,
+                            ),
+                            PopupMenuItem(
                               child: Text('Turn fullscreen '
                                   '${_lastStatusResponse.fullscreen ? 'OFF' : 'ON'}'),
                               value: _PopupMenuChoice.FULLSCREEN,
@@ -1196,11 +1244,9 @@ class _RemoteControlState extends State<RemoteControl> {
               builder: (context, scale, child) => ScaleTransition(
                 scale: AlwaysStoppedAnimation<double>(scale),
                 child: FloatingActionButton(
-                  child: IconButton(
-                    icon: Icon(
-                      Icons.eject,
-                      color: Colors.white,
-                    ),
+                  child: Icon(
+                    Icons.eject,
+                    color: Colors.white,
                   ),
                   onPressed: _openMedia,
                 ),
