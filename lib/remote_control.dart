@@ -983,14 +983,17 @@ class _RemoteControlState extends State<RemoteControl> {
                         tooltip: 'Refresh VLC status',
                       ),
                     ),
-                    GestureDetector(
-                      onLongPress: _toggleEqualizer,
-                      child: IconButton(
-                        color: _equalizer?.enabled == true
-                            ? theme.primaryColor
-                            : null,
-                        icon: Icon(Icons.equalizer),
-                        onPressed: _showEqualizer,
+                    Visibility(
+                      visible: _lastStatusResponseCode == 200,
+                      child: GestureDetector(
+                        onLongPress: _toggleEqualizer,
+                        child: IconButton(
+                          color: _equalizer?.enabled == true
+                              ? theme.primaryColor
+                              : null,
+                          icon: Icon(Icons.equalizer),
+                          onPressed: _showEqualizer,
+                        ),
                       ),
                     ),
                     Visibility(
