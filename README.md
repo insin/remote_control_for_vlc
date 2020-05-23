@@ -33,6 +33,6 @@ The app's guides for initial VLC configuration and finding your host IP if it ca
 
 ### Settings
 
-| Settings screen  | Host IP guide |
-| ---------------- | ------------- |
-| [![](screenshots/settings.png)](screenshots/settings.png) | [![](screenshots/host-ip-guide-os.png)](screenshots/host-ip-guide-os.png) |
+| Settings screen  | Host IP guide | Equalizer |
+| ---------------- | ------------- | --------- |
+| [![](screenshots/settings.png)](screenshots/settings.png) | [![](screenshots/host-ip-guide-os.png)](screenshots/host-ip-guide-os.png) | [![](screenshots/equalizer.png)](screenshots/equalizer.png) |
