@@ -1143,7 +1143,8 @@ class _RemoteControlState extends State<RemoteControl> {
         children: [
           if (widget.settings.blurredCoverBg &&
               _playing != null &&
-              _playing.isAudio)
+              _playing.isAudio &&
+              _backgroundArtUrl != null)
             Positioned.fill(
               child: Opacity(
                 opacity: .15,
