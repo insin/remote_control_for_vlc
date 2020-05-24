@@ -220,6 +220,11 @@ class Equalizer {
   List<Preset> presets;
   List<Band> bands;
   double preamp;
+
+  @override
+  String toString() {
+    return bands.map((band) => band.value.toStringAsFixed(1)).join('\t');
+  }
 }
 
 class Band {

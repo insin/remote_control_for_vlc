@@ -264,10 +264,17 @@ class _RemoteControlState extends State<RemoteControl> {
     var statusResponse = VlcStatusResponse(document);
     assert(() {
       if (queryParameters != null) {
-        print('VlcStatusRequest(${queryParameters ?? {}}) => $statusResponse');
+        //print('VlcStatusRequest(${queryParameters ?? {}}) => $statusResponse');
       }
       return true;
     }());
+
+    /// Don't update the playlist view every time we adjust an equalizer band,
+    /// as we'll be doing them in batches of up to 7 by default.
+    if (queryParameters != null && queryParameters['command'] == 'equalizer') {
+      _equalizerController.add(statusResponse.equalizer);
+      return;
+    }
 
     // State changes aren't reflected in commands which start and stop playback
     var ignoreStateUpdates = queryParameters != null &&

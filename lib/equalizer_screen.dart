@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:just_throttle_it/just_throttle_it.dart';
 
 import 'models.dart';
@@ -13,6 +15,19 @@ String _decibelsToString(double db) {
   }
   return string;
 }
+
+var _frequencies = [
+  '60Hz',
+  '170Hz',
+  '310Hz',
+  '600Hz',
+  '1KHz',
+  '3KHz',
+  '6KHz',
+  '12KHz',
+  '14KHz',
+  '16KHz'
+];
 
 class EqualizerScreen extends StatefulWidget {
   final Equalizer equalizer;
@@ -41,10 +56,16 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
   Preset _preset;
   double _preamp;
 
+  bool _snapBands = true;
+  int _draggingBand;
+  Equalizer _draggingEqualizer;
+  double _dragStartValue;
+  double _dragValue;
+
   @override
   void initState() {
     _equalizer = widget.equalizer;
-    _equalizerSubscription = widget.equalizerStream.listen(_onLatestState);
+    _equalizerSubscription = widget.equalizerStream.listen(_onEqualizer);
     super.initState();
   }
 
@@ -77,32 +98,115 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
     }
   }
 
-  _onLatestState(Equalizer newState) {
-    if (newState == null) {
+  _onEqualizer(Equalizer equalizer) {
+    if (equalizer == null) {
       Navigator.pop(context);
       return;
     }
     this.setState(() {
       if (_preamp != null &&
           _decibelsToString(_equalizer.preamp) != _decibelsToString(_preamp) &&
-          _decibelsToString(newState.preamp) == _decibelsToString(_preamp)) {
+          _decibelsToString(equalizer.preamp) == _decibelsToString(_preamp)) {
         _preamp = null;
       }
-      _equalizer = newState;
+      if (_draggingBand == null &&
+          _draggingEqualizer != null &&
+          _draggingEqualizer.bands.every((band) =>
+              _decibelsToString(band.value) ==
+              _decibelsToString(equalizer.bands[band.id].value))) {
+        _draggingEqualizer = null;
+      }
+      _equalizer = equalizer;
     });
   }
 
-  String get _preampLabel => _decibelsToString(_preamp ?? _equalizer.preamp);
+  double _getBandValue(int band) {
+    // Not dragging, use the current value
+    // If we finished changing a band, use the new values until they're current
+    if (_draggingBand == null) {
+      return (_draggingEqualizer ?? _equalizer).bands[band].value;
+    }
+    // The dragging band always uses the drag value
+    if (band == _draggingBand) {
+      return _dragValue;
+    }
+    // If we're not snapping, other bands use the current value
+    if (!_snapBands) {
+      return _equalizer.bands[band].value;
+    }
+    // Otherwise add portions of the size of the change to neighbouring bands
+    var distance = (band - _draggingBand).abs();
+    switch (distance) {
+      case 1:
+        return (_draggingEqualizer.bands[band].value +
+                ((_dragValue - _dragStartValue) / 2))
+            .clamp(-20.0, 20.0);
+      case 2:
+        return (_draggingEqualizer.bands[band].value +
+                ((_dragValue - _dragStartValue) / 8))
+            .clamp(-20.0, 20.0);
+      case 3:
+        return (_draggingEqualizer.bands[band].value +
+                ((_dragValue - _dragStartValue) / 40))
+            .clamp(-20.0, 20.0);
+      default:
+        return _equalizer.bands[band].value;
+    }
+  }
+
+  _onBandChangeStart(int band, double value) {
+    setState(() {
+      _draggingEqualizer = _equalizer;
+      _draggingBand = band;
+      _dragStartValue = value;
+      _dragValue = value;
+    });
+  }
+
+  _onBandChanged(double value) {
+    setState(() {
+      _dragValue = value;
+    });
+  }
+
+  _onBandChangeEnd(double value) {
+    List<Band> bandChanges = [];
+    if (!_snapBands) {
+      _draggingEqualizer.bands[_draggingBand].value = value;
+      bandChanges.add(Band(_draggingBand, value));
+    } else {
+      for (int band = math.max(0, _draggingBand - 3);
+          band < math.min(_frequencies.length, _draggingBand + 4);
+          band++) {
+        var value = _getBandValue(band);
+        // Store new values to display while VLC status catches up
+        _draggingEqualizer.bands[band].value = value;
+        bandChanges.add(Band(band, value));
+      }
+    }
+    setState(() {
+      _draggingBand = null;
+      _dragStartValue = null;
+      _dragValue = null;
+    });
+    SchedulerBinding.instance.addPostFrameCallback((timeStamp) {
+      bandChanges.forEach((band) =>
+          widget.onBandChange(band.id, _decibelsToString(band.value)));
+    });
+  }
+
+  _updateBands(int band, double value) {}
 
   @override
   Widget build(BuildContext context) {
+    var theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(intl('Equalizer')),
       ),
       body: ListView(children: [
         SwitchListTile(
-          title: Text('Enable'),
+          title: Text('Enable', textAlign: TextAlign.right),
           value: _equalizer.enabled,
           onChanged: widget.onToggleEnabled,
         ),
@@ -113,83 +217,58 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
               subtitle: Text(_preset?.name ?? 'Tap to select'),
               onTap: _choosePreset,
             ),
-            ListTile(
-              title: Text('Preamp'),
-              subtitle: SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  trackShape: FullWidthTrackShape(),
-                ),
-                child: Slider(
-                  max: 20,
-                  min: -20,
-                  value: _preamp ?? _equalizer.preamp,
-                  onChanged: (db) {
-                    setState(() {
-                      _preamp = db;
-                    });
-                    Throttle.milliseconds(
-                        333, widget.onPreampChange, [_decibelsToString(db)]);
-                  },
-                  onChangeEnd: (preamp) {
-                    widget.onPreampChange(_decibelsToString(preamp));
-                  },
-                ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: <Widget>[
+                  Text('Preamp', style: theme.textTheme.subtitle1),
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackShape: FullWidthTrackShape(),
+                      ),
+                      child: Slider(
+                        max: 20,
+                        min: -20,
+                        value: _preamp ?? _equalizer.preamp,
+                        onChanged: (db) {
+                          setState(() {
+                            _preamp = db;
+                          });
+                          Throttle.milliseconds(333, widget.onPreampChange,
+                              [_decibelsToString(db)]);
+                        },
+                        onChangeEnd: (preamp) {
+                          widget.onPreampChange(_decibelsToString(preamp));
+                        },
+                      ),
+                    ),
+                  )
+                ],
               ),
-              trailing: Padding(
-                  padding: EdgeInsets.only(top: 23),
-                  child: Text('$_preampLabel dB')),
             ),
-            ListTile(
-              title: Text('Low End EQ'),
-            ),
+            SizedBox(height: 16),
             Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-              _VerticalBandSlider(
-                  label: '60 Hz',
-                  band: _equalizer.bands[0],
-                  onBandChange: widget.onBandChange),
-              _VerticalBandSlider(
-                  label: '170 Hz',
-                  band: _equalizer.bands[1],
-                  onBandChange: widget.onBandChange),
-              _VerticalBandSlider(
-                  label: '310 Hz',
-                  band: _equalizer.bands[2],
-                  onBandChange: widget.onBandChange),
-              _VerticalBandSlider(
-                  label: '600 Hz',
-                  band: _equalizer.bands[3],
-                  onBandChange: widget.onBandChange),
-              _VerticalBandSlider(
-                  label: '1 KHz',
-                  band: _equalizer.bands[4],
-                  onBandChange: widget.onBandChange),
+              for (int i = 0; i < _frequencies.length; i++)
+                _VerticalBandSlider(
+                  label: _frequencies[i],
+                  band: i,
+                  value: _getBandValue(i),
+                  onChangeStart: _onBandChangeStart,
+                  onChanged: _onBandChanged,
+                  onChangeEnd: _onBandChangeEnd,
+                ),
             ]),
-            ListTile(
-              title: Text('High End EQ'),
+            SwitchListTile(
+              title: Text('Snap bands', textAlign: TextAlign.right),
+              value: _snapBands,
+              onChanged: (snapBands) {
+                setState(() {
+                  _snapBands = snapBands;
+                });
+              },
             ),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-              _VerticalBandSlider(
-                  label: '3 KHz',
-                  band: _equalizer.bands[5],
-                  onBandChange: widget.onBandChange),
-              _VerticalBandSlider(
-                  label: '6 KHz',
-                  band: _equalizer.bands[6],
-                  onBandChange: widget.onBandChange),
-              _VerticalBandSlider(
-                  label: '12 KHz',
-                  band: _equalizer.bands[7],
-                  onBandChange: widget.onBandChange),
-              _VerticalBandSlider(
-                  label: '14 KHz',
-                  band: _equalizer.bands[8],
-                  onBandChange: widget.onBandChange),
-              _VerticalBandSlider(
-                  label: '16 KHz',
-                  band: _equalizer.bands[9],
-                  onBandChange: widget.onBandChange),
-            ]),
-            SizedBox(height: 24)
           ]),
       ]),
     );
@@ -197,64 +276,61 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
 }
 
 class _VerticalBandSlider extends StatefulWidget {
-  final Band band;
   final String label;
-  final Function(int bandId, String db) onBandChange;
+  final int band;
+  final double value;
+  final Function(int band, double value) onChangeStart;
+  final Function(double value) onChanged;
+  final Function(double value) onChangeEnd;
 
-  _VerticalBandSlider({this.label, this.band, this.onBandChange});
+  _VerticalBandSlider({
+    this.label,
+    this.band,
+    this.value,
+    this.onChangeStart,
+    this.onChanged,
+    this.onChangeEnd,
+  });
 
   @override
   _VerticalBandSliderState createState() => _VerticalBandSliderState();
 }
 
 class _VerticalBandSliderState extends State<_VerticalBandSlider> {
-  double _value;
-
-  @override
-  void didUpdateWidget(_VerticalBandSlider oldWidget) {
-    if (_value != null &&
-        _decibelsToString(oldWidget.band.value) != _decibelsToString(_value) &&
-        _decibelsToString(widget.band.value) == _decibelsToString(_value)) {
-      setState(() {
-        _value = null;
-      });
-    }
-    super.didUpdateWidget(oldWidget);
-  }
-
-  String get _label => _decibelsToString(_value ?? widget.band.value);
-
   @override
   Widget build(BuildContext context) {
     return Column(children: [
+      Text('+20dB', style: TextStyle(fontSize: 10)),
+      SizedBox(height: 16),
       RotatedBox(
         quarterTurns: -1,
         child: SliderTheme(
           data: SliderTheme.of(context).copyWith(
             trackShape: FullWidthTrackShape(),
+            thumbShape: RoundSliderThumbShape(enabledThumbRadius: 8),
+            overlayShape: RoundSliderOverlayShape(overlayRadius: 16),
           ),
           child: Slider(
             max: 20,
             min: -20,
-            value: _value ?? widget.band.value,
-            onChanged: (db) {
-              setState(() {
-                _value = db;
-              });
-              Throttle.milliseconds(333, widget.onBandChange,
-                  [widget.band.id, _decibelsToString(db)]);
+            value: widget.value,
+            onChangeStart: (value) {
+              widget.onChangeStart(widget.band, value);
             },
-            onChangeEnd: (db) {
-              widget.onBandChange(widget.band.id, _decibelsToString(db));
+            onChanged: (value) {
+              widget.onChanged(value);
+            },
+            onChangeEnd: (value) {
+              widget.onChangeEnd(value);
             },
           ),
         ),
       ),
-      SizedBox(height: 10),
-      Text(widget.label,
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+      SizedBox(height: 16),
+      Text('-20dB', style: TextStyle(fontSize: 10)),
       SizedBox(height: 8),
-      Text('$_label dB', style: TextStyle(fontSize: 12))
+      Text(widget.label,
+          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
     ]);
   }
 }
