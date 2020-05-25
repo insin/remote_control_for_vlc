@@ -223,7 +223,10 @@ class Equalizer {
 
   @override
   String toString() {
-    return bands.map((band) => band.value.toStringAsFixed(1)).join('\t');
+    if (!enabled) {
+      return 'Equalizer(off)';
+    }
+    return 'Equalizer(preamp: ${preamp.toStringAsFixed(1)}, bands: ${bands.map((b) => b.value.toStringAsFixed(1)).join(', ')})';
   }
 }
 

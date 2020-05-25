@@ -251,6 +251,20 @@ class _RemoteControlState extends State<RemoteControl> {
     return xml.parse(responseBody);
   }
 
+  Future<Equalizer> _equalizerRequest(
+      Map<String, String> queryParameters) async {
+    xml.XmlDocument document = await _serverRequest('status', queryParameters);
+    if (document == null) {
+      return null;
+    }
+    var equalizer = VlcStatusResponse(document).equalizer;
+    assert(() {
+      //print('$queryParameters => $equalizer');
+      return true;
+    }());
+    return equalizer;
+  }
+
   /// Send a request to VLC's status API endpoint - this is used to submit
   /// commands as well as getting the current state of VLC.
   _statusRequest([Map<String, String> queryParameters]) async {
@@ -268,13 +282,6 @@ class _RemoteControlState extends State<RemoteControl> {
       }
       return true;
     }());
-
-    /// Don't update the playlist view every time we adjust an equalizer band,
-    /// as we'll be doing them in batches of up to 7 by default.
-    if (queryParameters != null && queryParameters['command'] == 'equalizer') {
-      _equalizerController.add(statusResponse.equalizer);
-      return;
-    }
 
     // State changes aren't reflected in commands which start and stop playback
     var ignoreStateUpdates = queryParameters != null &&
@@ -687,21 +694,19 @@ class _RemoteControlState extends State<RemoteControl> {
           equalizer: _equalizer,
           equalizerStream: _equalizerController.stream,
           onToggleEnabled: (enabled) {
-            _statusRequest({'command': 'enableeq', 'val': enabled ? '1' : '0'});
-            _scheduleSingleUpdate();
+            return _equalizerRequest(
+                {'command': 'enableeq', 'val': enabled ? '1' : '0'});
           },
           onPresetChange: (presetId) {
-            _statusRequest({'command': 'setpreset', 'val': '$presetId'});
-            _scheduleSingleUpdate();
+            return _equalizerRequest(
+                {'command': 'setpreset', 'val': '$presetId'});
           },
           onPreampChange: (value) {
-            _statusRequest({'command': 'preamp', 'val': '$value'});
-            _scheduleSingleUpdate();
+            return _equalizerRequest({'command': 'preamp', 'val': '$value'});
           },
           onBandChange: (bandId, value) {
-            _statusRequest(
+            return _equalizerRequest(
                 {'command': 'equalizer', 'band': '$bandId', 'val': value});
-            _scheduleSingleUpdate();
           },
         ),
       ),

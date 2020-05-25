@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:just_throttle_it/just_throttle_it.dart';
 
 import 'models.dart';
@@ -32,10 +31,10 @@ var _frequencies = [
 class EqualizerScreen extends StatefulWidget {
   final Equalizer equalizer;
   final Stream<Equalizer> equalizerStream;
-  final Function(bool enabled) onToggleEnabled;
-  final Function(int presetId) onPresetChange;
-  final Function(String db) onPreampChange;
-  final Function(int bandId, String db) onBandChange;
+  final Future<Equalizer> Function(bool enabled) onToggleEnabled;
+  final Future<Equalizer> Function(int presetId) onPresetChange;
+  final Future<Equalizer> Function(String db) onPreampChange;
+  final Future<Equalizer> Function(int bandId, String db) onBandChange;
 
   EqualizerScreen({
     this.equalizer,
@@ -51,15 +50,49 @@ class EqualizerScreen extends StatefulWidget {
 }
 
 class _EqualizerScreenState extends State<EqualizerScreen> {
+  /// The most recent equalizer status from VLC.
   Equalizer _equalizer;
+
+  /// Used to listen for equalizer status updates from VLC.
   StreamSubscription _equalizerSubscription;
+
+  /// TODO Extract preset settings from VLC and use their preamp and band values to match a preset name
+  /// The last-selected preset - selected preset info isn't available from VLC.
   Preset _preset;
+
+  /// The value for the Preamp slider during and after finishing dragging it.
+  ///
+  /// This will be removed once the preamp value from a VLC status update
+  /// matches it.
   double _preamp;
 
+  /// Used to ignore equalizer status updates VLC after a band change finishes
+  /// while sending requests to update equalizer bands.
+  bool _ignoreStatusUpdates = false;
+
+  /// When `true`, equalizer bands close to the band being adjusted will be
+  /// adjusted in the same direction proportional to the amount the band has
+  /// changed, falling off as proximity to the changing band decreases.
   bool _snapBands = true;
+
+  /// The id/index of the band slider currently being dragged.
   int _draggingBand;
+
+  /// The initial equalizer state when a band slider started dragging.- used to
+  /// calculate values for other bands when [_snapBands] is `true.
+  ///
+  /// To prevent band values jumping to their former values after a drag
+  /// finishes, values for modified bands are stored in this object, which is
+  /// used for display until equalizer band values from VLC status updates match
+  /// its values.
   Equalizer _draggingEqualizer;
+
+  /// The value [_draggingBand] had when its drag started
+  ///
+  /// Used with [_dragValue] to calculate the delta when snapping bands.
   double _dragStartValue;
+
+  /// The current value of the band being dragged.
   double _dragValue;
 
   @override
@@ -73,6 +106,39 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
   void dispose() {
     _equalizerSubscription.cancel();
     super.dispose();
+  }
+
+  _onEqualizer(Equalizer equalizer) {
+    if (equalizer == null) {
+      Navigator.pop(context);
+      return;
+    }
+    if (_ignoreStatusUpdates) {
+      return;
+    }
+    this.setState(() {
+      // Get rid of the equalizer containing values from a finished EQ change
+      // once the equalizer from VLC status updates matches it.
+      if (_draggingBand == null &&
+          _draggingEqualizer != null &&
+          _draggingEqualizer.bands.every((band) =>
+              _decibelsToString(band.value) ==
+              _decibelsToString(equalizer.bands[band.id].value))) {
+        _draggingEqualizer = null;
+      }
+      _equalizer = equalizer;
+    });
+  }
+
+  _toggleEnabled(enabled) async {
+    var equalizer = await widget.onToggleEnabled(enabled);
+    if (equalizer == null) {
+      Navigator.pop(context);
+      return;
+    }
+    setState(() {
+      _equalizer = equalizer;
+    });
   }
 
   _choosePreset() async {
@@ -90,33 +156,31 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
             .toList(),
       ),
     );
-    if (preset != null) {
-      setState(() {
-        _preset = preset;
-      });
-      widget.onPresetChange(preset.id);
+    if (preset == null) {
+      return;
     }
-  }
-
-  _onEqualizer(Equalizer equalizer) {
+    setState(() {
+      _preset = preset;
+    });
+    var equalizer = await widget.onPresetChange(preset.id);
     if (equalizer == null) {
       Navigator.pop(context);
       return;
     }
-    this.setState(() {
-      if (_preamp != null &&
-          _decibelsToString(_equalizer.preamp) != _decibelsToString(_preamp) &&
-          _decibelsToString(equalizer.preamp) == _decibelsToString(_preamp)) {
-        _preamp = null;
-      }
-      if (_draggingBand == null &&
-          _draggingEqualizer != null &&
-          _draggingEqualizer.bands.every((band) =>
-              _decibelsToString(band.value) ==
-              _decibelsToString(equalizer.bands[band.id].value))) {
-        _draggingEqualizer = null;
-      }
+    setState(() {
       _equalizer = equalizer;
+    });
+  }
+
+  _onPreampChanged(preamp) async {
+    var equalizer = await widget.onPreampChange(_decibelsToString(preamp));
+    if (equalizer == null) {
+      Navigator.pop(context);
+      return;
+    }
+    setState(() {
+      _equalizer = equalizer;
+      _preamp = null;
     });
   }
 
@@ -169,7 +233,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
     });
   }
 
-  _onBandChangeEnd(double value) {
+  _onBandChangeEnd(double value) async {
     List<Band> bandChanges = [];
     if (!_snapBands) {
       _draggingEqualizer.bands[_draggingBand].value = value;
@@ -189,13 +253,11 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
       _dragStartValue = null;
       _dragValue = null;
     });
-    SchedulerBinding.instance.addPostFrameCallback((timeStamp) {
-      bandChanges.forEach((band) =>
-          widget.onBandChange(band.id, _decibelsToString(band.value)));
-    });
+    _ignoreStatusUpdates = true;
+    await Future.wait(bandChanges.map(
+        (band) => widget.onBandChange(band.id, _decibelsToString(band.value))));
+    _ignoreStatusUpdates = false;
   }
-
-  _updateBands(int band, double value) {}
 
   @override
   Widget build(BuildContext context) {
@@ -208,7 +270,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
         SwitchListTile(
           title: Text('Enable', textAlign: TextAlign.right),
           value: _equalizer.enabled,
-          onChanged: widget.onToggleEnabled,
+          onChanged: _toggleEnabled,
         ),
         if (_equalizer.enabled)
           Column(children: [
@@ -239,9 +301,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
                           Throttle.milliseconds(333, widget.onPreampChange,
                               [_decibelsToString(db)]);
                         },
-                        onChangeEnd: (preamp) {
-                          widget.onPreampChange(_decibelsToString(preamp));
-                        },
+                        onChangeEnd: _onPreampChanged,
                       ),
                     ),
                   )
