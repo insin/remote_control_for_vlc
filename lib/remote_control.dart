@@ -1516,13 +1516,16 @@ class _RemoteControlState extends State<RemoteControl> {
                     builder: (context) => GestureDetector(
                       onTap: _toggleVolumeControls,
                       onLongPress: _toggleMute,
-                      child: Icon(_volume == 0
-                          ? Icons.volume_off
-                          : _volume < 102
-                              ? Icons.volume_mute
-                              : _volume < 218
-                                  ? Icons.volume_down
-                                  : Icons.volume_up),
+                      child: Icon(
+                        _volume == 0
+                            ? Icons.volume_off
+                            : _volume < 102
+                                ? Icons.volume_mute
+                                : _volume < 218
+                                    ? Icons.volume_down
+                                    : Icons.volume_up,
+                        color: Colors.black,
+                      ),
                     ),
                   )
                 ],
@@ -1547,6 +1550,7 @@ class _RemoteControlState extends State<RemoteControl> {
                   GestureDetector(
                     child: Icon(
                       Icons.skip_previous,
+                      color: Colors.black,
                       size: 30,
                     ),
                     onTap: _previous,
@@ -1556,6 +1560,7 @@ class _RemoteControlState extends State<RemoteControl> {
                   GestureDetector(
                     child: Icon(
                       Icons.fast_rewind,
+                      color: Colors.black,
                       size: 30,
                     ),
                     onTap: () {
@@ -1577,6 +1582,7 @@ class _RemoteControlState extends State<RemoteControl> {
                         duration: Duration(milliseconds: 250),
                         curve: Curves.easeInOut,
                         builder: (context, progress, child) => AnimatedIcon(
+                          color: Colors.black,
                           size: 42,
                           icon: AnimatedIcons.play_pause,
                           progress: AlwaysStoppedAnimation<double>(progress),
@@ -1588,6 +1594,7 @@ class _RemoteControlState extends State<RemoteControl> {
                   GestureDetector(
                     child: Icon(
                       Icons.fast_forward,
+                      color: Colors.black,
                       size: 30,
                     ),
                     onTap: () {
@@ -1598,6 +1605,7 @@ class _RemoteControlState extends State<RemoteControl> {
                   GestureDetector(
                     child: Icon(
                       Icons.skip_next,
+                      color: Colors.black,
                       size: 30,
                     ),
                     onTap: _next,
