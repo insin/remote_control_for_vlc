@@ -30,6 +30,7 @@ enum _PopupMenuChoice {
   EMPTY_PLAYLIST,
   FULLSCREEN,
   SETTINGS,
+  SNAPSHOT,
   SUBTITLE_TRACK
 }
 
@@ -619,6 +620,9 @@ class _RemoteControlState extends State<RemoteControl> {
       case _PopupMenuChoice.SETTINGS:
         _showSettings();
         break;
+      case _PopupMenuChoice.SNAPSHOT:
+        _takeSnapshot();
+        break;
       case _PopupMenuChoice.SUBTITLE_TRACK:
         _chooseSubtitleTrack();
         break;
@@ -719,6 +723,10 @@ class _RemoteControlState extends State<RemoteControl> {
 
   _emptyPlaylist() {
     _statusCommand('pl_empty');
+  }
+
+  _takeSnapshot() {
+    _statusCommand('snapshot');
   }
   //#endregion
 
@@ -1055,6 +1063,18 @@ class _RemoteControlState extends State<RemoteControl> {
                                     (_playing.isVideo || _playing.isWeb),
                               ),
                               value: _PopupMenuChoice.FULLSCREEN,
+                              enabled: _playing != null &&
+                                  (_playing.isVideo || _playing.isWeb),
+                            ),
+                            PopupMenuItem(
+                              child: ListTile(
+                                dense: widget.settings.dense,
+                                leading: Icon(Icons.image),
+                                title: Text('Take snapshot'),
+                                enabled: _playing != null &&
+                                    (_playing.isVideo || _playing.isWeb),
+                              ),
+                              value: _PopupMenuChoice.SNAPSHOT,
                               enabled: _playing != null &&
                                   (_playing.isVideo || _playing.isWeb),
                             ),
