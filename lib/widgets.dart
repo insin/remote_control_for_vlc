@@ -78,10 +78,12 @@ class FullWidthTrackShape extends RoundedRectSliderTrackShape {
 
 var _intlStrings = {
   'Equalizer': 'Equaliser',
+  'Settings': 'Settings',
 };
 
 String intl(String enUsString) {
-  if (ui.window.locale.countryCode == 'US') {
+  if (ui.window.locale.countryCode == 'US' ||
+      !_intlStrings.containsKey(enUsString)) {
     return enUsString;
   }
   return _intlStrings[enUsString];
