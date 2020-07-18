@@ -9,6 +9,7 @@
 .gradle/
 .history
 .svn/
+demo-playlist.xspf
 
 # IntelliJ related
 *.iml

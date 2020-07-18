@@ -27,12 +27,12 @@ The app's guides for initial VLC configuration and finding your host IP if it ca
 
 ### Browsing for and playing media
 
-| Open media  | File browser | Playlist |
-| ----------- | ------------ | -------- |
-| [![](screenshots/open-media.png)](screenshots/open-media.png) | [![](screenshots/file-browser.png)](screenshots/file-browser.png) | [![](screenshots/playing-vlc.png)](screenshots/playing-vlc.png) |
+| Open media  | File browser | Playlist | Playlist Menu |
+| ----------- | ------------ | -------- | ------------- |
+| [![](screenshots/open-media.png)](screenshots/open-media.png) | [![](screenshots/file-browser.png)](screenshots/file-browser.png) | [![](screenshots/playing-vlc.png)](screenshots/playing-vlc.png) | [![](screenshots/playing-menu-vlc.png)](screenshots/playing-menu-vlc.png) |
 
 ### Settings
 
-| Settings screen  | Host IP guide | Equalizer |
-| ---------------- | ------------- | --------- |
-| [![](screenshots/settings.png)](screenshots/settings.png) | [![](screenshots/host-ip-guide-os.png)](screenshots/host-ip-guide-os.png) | [![](screenshots/equalizer.png)](screenshots/equalizer.png) |
+| Settings screen  | Host IP guide | Equalizer | Playback Speed |
+| ---------------- | ------------- | --------- | -------------- |
+| [![](screenshots/settings.png)](screenshots/settings.png) | [![](screenshots/host-ip-guide-os.png)](screenshots/host-ip-guide-os.png) | [![](screenshots/equalizer.png)](screenshots/equalizer.png) | [![](screenshots/playback-speed.png)](screenshots/playback-speed.png) |
