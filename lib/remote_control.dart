@@ -23,12 +23,13 @@ import 'widgets.dart';
 
 var _headerFooterBgColor = Color.fromRGBO(241, 241, 241, 1.0);
 const _tickIntervalSeconds = 1;
-const _volumeSlidingThrottleMilliseconds = 333;
+const _sliderThrottleMilliseconds = 333;
 
 enum _PopupMenuChoice {
   AUDIO_TRACK,
   EMPTY_PLAYLIST,
   FULLSCREEN,
+  PLAYBACK_SPEED,
   SETTINGS,
   SNAPSHOT,
   SUBTITLE_TRACK
@@ -82,6 +83,7 @@ class _RemoteControlState extends State<RemoteControl> {
   Duration _time = Duration.zero;
   Duration _length = Duration.zero;
   int _volume = 256;
+  double _rate = 1.0;
   bool _repeat = false;
   bool _loop = false;
   bool _random = false;
@@ -91,6 +93,7 @@ class _RemoteControlState extends State<RemoteControl> {
   /// toggle playback settings.
   DateTime _ignoreLoopStatusBefore;
   DateTime _ignoreRandomStatusBefore;
+  DateTime _ignoreRateStatusBefore;
   //#endregion
 
   //#region Playlist state
@@ -131,6 +134,10 @@ class _RemoteControlState extends State<RemoteControl> {
   /// Set to true when the user is dragging the time slider - used to ignore
   /// time in status updates from VLC.
   bool _draggingTime = false;
+
+  /// Set to true when the user is dragging the playback speed slider - used to
+  /// ignore rate in status updates from VLC.
+  bool _draggingRate = false;
   //#endregion
 
   @override
@@ -296,6 +303,10 @@ class _RemoteControlState extends State<RemoteControl> {
         _ignoreVolumeStatusBefore != null &&
             requestTime.isBefore(_ignoreVolumeStatusBefore);
 
+    var ignoreRateUpdate = _draggingRate ||
+        _ignoreRateStatusBefore != null &&
+            requestTime.isBefore(_ignoreRateStatusBefore);
+
     setState(() {
       if (!ignoreStateUpdates) {
         _state = statusResponse.state;
@@ -305,6 +316,9 @@ class _RemoteControlState extends State<RemoteControl> {
           : statusResponse.length;
       if (!ignoreVolumeUpdates && statusResponse.volume != null) {
         _volume = statusResponse.volume.clamp(0, 512);
+      }
+      if (!ignoreRateUpdate) {
+        _rate = statusResponse.rate;
       }
       // Keep the current title and artist when playback is stopped
       if (statusResponse.currentPlId != '-1') {
@@ -617,6 +631,9 @@ class _RemoteControlState extends State<RemoteControl> {
       case _PopupMenuChoice.FULLSCREEN:
         _toggleFullScreen();
         break;
+      case _PopupMenuChoice.PLAYBACK_SPEED:
+        _showPlaybackSpeedControl();
+        break;
       case _PopupMenuChoice.SETTINGS:
         _showSettings();
         break;
@@ -727,6 +744,177 @@ class _RemoteControlState extends State<RemoteControl> {
 
   _takeSnapshot() {
     _statusCommand('snapshot');
+  }
+
+  /// Convert the VLC playback [_rate] to a slider value between 0.0 and 1.0,
+  /// where 0.25x → 0.0, 1.0x → 0.5 and 4.0x → 1.0.
+  ///
+  /// This matches the range of VLC's own playback rate slider, but it's
+  /// possible for the rate to be set outside this range.
+  double get _rateSliderValue {
+    double value;
+    if (_rate == 1.0) {
+      value = 0.5;
+    } else if (_rate < 1) {
+      value = (_rate - 0.25) / 0.75 / 2;
+    } else {
+      value = 0.5 + ((_rate - 1) / 3.0 / 2);
+    }
+    return value.clamp(0.0, 1.0);
+  }
+
+  /// Convert a playback speed slider value between 0.0 and 1.0 to a VLC
+  /// playback [_rate], where 0.0 → 0.25x, 0.5 -> 1.0x and 1.0 → 4.0x.
+  ///
+  /// This matches the range of VLC's own playback rate slider.
+  double _sliderValueToRate(double value) {
+    double rate;
+    if (value == 0.5) {
+      rate = 1.0;
+    } else if (value < 0.5) {
+      rate = 0.25 + (0.75 * value * 2);
+    } else {
+      rate = 1.0 + (3.0 * (value - 0.5) * 2);
+    }
+    return rate.clamp(0.25, 4.0);
+  }
+
+  _showPlaybackSpeedControl() {
+    var theme = Theme.of(context);
+    showModalBottomSheet(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
+        ),
+      ),
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      context: context,
+      builder: (builder) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Wrap(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 16, top: 12, bottom: 8),
+                  child: Text(
+                    'Playback speed',
+                    style: TextStyle(
+                      color: theme.primaryColor,
+                      fontSize: 20,
+                    ),
+                  ),
+                ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: <Widget>[
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 16.0, right: 8.0),
+                        child: Column(
+                          children: <Widget>[
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: <Widget>[
+                                Text('0.25'),
+                                Text(
+                                  '${_rate.toStringAsFixed(2)}x',
+                                  style: TextStyle(
+                                    color: theme.primaryColor,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text('4.00')
+                              ],
+                            ),
+                            SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                trackShape: FullWidthTrackShape(),
+                              ),
+                              child: Slider(
+                                value: _rateSliderValue,
+                                onChangeStart: (value) {
+                                  setState(() {
+                                    _draggingRate = true;
+                                  });
+                                },
+                                onChanged: (value) {
+                                  setState(() {
+                                    _rate = _sliderValueToRate(value);
+                                  });
+                                  Throttle.milliseconds(
+                                      _sliderThrottleMilliseconds,
+                                      _setRate,
+                                      [_rate]);
+                                },
+                                onChangeEnd: (value) {
+                                  _setRate(_rate);
+                                  setState(() {
+                                    _draggingRate = false;
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Column(
+                      children: <Widget>[
+                        Padding(
+                          padding: const EdgeInsets.only(
+                              right: 8, bottom: 4, left: 8),
+                          child: ClipOval(
+                            child: Material(
+                              color: Colors.grey.shade200,
+                              child: IconButton(
+                                color: Colors.black,
+                                icon: Icon(Icons.keyboard_arrow_up),
+                                onPressed: () {
+                                  setState(() {
+                                    _rate =
+                                        ((_rate + 0.1) * 10.0).roundToDouble() /
+                                            10.0;
+                                    _setRate(_rate);
+                                  });
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(
+                              right: 8, top: 4, left: 8, bottom: 8),
+                          child: ClipOval(
+                            child: Material(
+                              color: Colors.grey.shade200,
+                              child: IconButton(
+                                color: Colors.black,
+                                icon: Icon(Icons.keyboard_arrow_down),
+                                onPressed: () {
+                                  setState(() {
+                                    _rate =
+                                        ((_rate - 0.1) * 10.0).roundToDouble() /
+                                            10.0;
+                                    _setRate(_rate);
+                                  });
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  ],
+                )
+              ],
+            );
+          },
+        );
+      },
+    );
   }
   //#endregion
 
@@ -919,6 +1107,14 @@ class _RemoteControlState extends State<RemoteControl> {
     });
   }
 
+  _setRate(double rate) {
+    _ignoreRateStatusBefore = DateTime.now();
+    _statusRequest({
+      'command': 'rate',
+      'val': rate.toStringAsFixed(2),
+    });
+  }
+
   _stop() {
     _statusCommand('pl_stop');
   }
@@ -1077,6 +1273,14 @@ class _RemoteControlState extends State<RemoteControl> {
                               value: _PopupMenuChoice.SNAPSHOT,
                               enabled: _playing != null &&
                                   (_playing.isVideo || _playing.isWeb),
+                            ),
+                            PopupMenuItem(
+                              child: ListTile(
+                                dense: widget.settings.dense,
+                                leading: Icon(Icons.directions_run),
+                                title: Text('Playback speed'),
+                              ),
+                              value: _PopupMenuChoice.PLAYBACK_SPEED,
                             ),
                             PopupMenuItem(
                               child: ListTile(
@@ -1430,7 +1634,7 @@ class _RemoteControlState extends State<RemoteControl> {
                       setState(() {
                         _volume = _scaleVolumePercent(percent);
                       });
-                      Throttle.milliseconds(_volumeSlidingThrottleMilliseconds,
+                      Throttle.milliseconds(_sliderThrottleMilliseconds,
                           _setVolumePercent, [percent], {#finished: false});
                     },
                     onChangeEnd: (percent) {

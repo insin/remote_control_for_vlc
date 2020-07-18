@@ -262,6 +262,9 @@ class VlcStatusResponse {
 
   int get volume => int.tryParse(document.findAllElements('volume').first.text);
 
+  double get rate =>
+      double.tryParse(document.findAllElements('rate').first.text);
+
   Map<String, String> get _metadata {
     if (this._info != null) {
       return _info;
