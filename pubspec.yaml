@@ -4,7 +4,7 @@ description: VLC remote control
 # Prevent accidentally publishing to pub.dev using `pub publish`
 publish_to: 'none'
 
-version: 1.3.2+11
+version: 1.4.0+12
 
 environment:
   sdk: ">=2.7.0 <3.0.0"
