@@ -12,6 +12,21 @@ var _videoExtensions = RegExp(
 var _audioExtensions = RegExp(
     r'\.(3ga|a52|aac|ac3|adt|adts|aif|aifc|aiff|alac|amr|aob|ape|awb|caf|dts|flac|it|m4a|m4b|m4p|mid|mka|mlp|mod|mpa|mp1|mp2|mp3|mpc|mpga|oga|ogg|oma|opus|ra|ram|rmi|s3m|spx|tta|voc|vqf|w64|wav|wma|wv|xa|xm)$');
 
+var _audioTranslations = RegExp(
+    r"^(Audio|_Audio|Ameslaw|Aodio|Audioa|Audiu|Deng|Dźwięk|Ekirikuhurirwa|Endobozi|Fuaim|Fuaim|Garsas|Hang|Hljóð|Leo|Ljud|Lyd|M_adungan|Ma giwinyo|Odio|Ojoo|Oudio|Ovoz|Sain|Ses|Sonido|Səs|Umsindo|Zvok|Zvuk|Zëri|Àudio|Áudio|Ääni|Ήχος|Аудио|Аўдыё|Дуу|Дыбыс|Звук|Ձայն|שמע|آڈیو, صدا|ئۈن|آڈیو|دەنگ|صدا|غږيز|अडिअ'|अडियो|आडियो|ध्वनी|অডিঅ'|অডিও|ਆਡੀਓ|ઓડિયો|ଅଡ଼ିଓ|ஒலி|శ్రవ్యకం|ಧ್ವನಿ|ഓഡിയോ|ශ්‍රව්‍ය|เสียง|အသံ|აუდიო|ተሰሚ|ድምፅ|អូឌីយ៉ូ|オーディオ|音訊|音频|오디오)$");
+
+var _descriptionTranslations = RegExp(
+    r"^(Description|Apraksts|Aprašymas|Açıklama|Beschreibung|Beschrijving|Beskriuwing|Beskrivelse|Beskrivning|Beskrywing|Cifagol|Cur síos|Descrición|Descriere|Descripcion|Descripció|Descripción|Descrizion|Descrizione|Descrição|Deskribapena|Deskripsi|Deskrivadur|Discrijhaedje|Discrizzione|Disgrifiad|Ennyinyonyola|Enshoborora|Fa'amatalaga|Hedef|Incazelo|Keterangan|Kirjeldus|Kuvaus|Leírás|Lýsing|Mô tả|Opis|Popis|Përshkrimi|Skildring|Ta’rifi|Te lok|Tuairisgeul|Περιγραφή|Апісанне|Баяндама|Опис|Описание|Сипаттама|Тайлбар|Тасвирлама|Նկարագրություն|תיאור|الوصف|سپړاوی|شرح|وضاحت|پەسن|چۈشەندۈرۈش|बेखेवथि|वर्णन|विवरण|বর্ণনা|বিবরণ|বিৱৰণ|ਵੇਰਵਾ|વર્ણન|ବିବରଣୀ|விவரம்|వివరణ|ವಿವರಣೆ|വിവരണം|විස්තරය|รายละเอียด|ဖော်ပြချက်|აღწერილობა|መግለጫ|សេចក្ដី​ពណ៌នា|描述|說明|説明|설명)$");
+
+var _languageTranslations = RegExp(
+    r"^(Language|Bahasa|Bahasa|Cànan|Dil|Gagana|Gjuha|Hizkuntza|Iaith|Idioma|Jazyk|Jezik|Kalba|Keel|Kieli|Langue|Leb|Lenga|Lenghe|Limbă|Lingaedje|Lingua|Llingua|Ngôn ngữ|Nyelv|Olulimi|Orurimi|Sprache|Språk|Taal|Teanga|Til|Tungumál|Ulimi|Valoda|Wybór języka|Yezh|Ziman|Ɗemngal|Γλώσσα|Език|Мова|Тел|Тил|Тілі|Хэл|Язык|Језик|Լեզու|שפה|اللغة|تىل|زبان|زمان|ژبه|भाषा|राव|ভাষা|ਭਾਸ਼ਾ|ભાષા|ଭାଷା|மொழி|భాష|ಭಾಷೆ|ഭാഷ|භාෂාව|ภาษา|ဘာသာစကား|ენა|ቋንቋ|ቋንቋ|ភាសា|言語|語言|语言|언어)$");
+
+var _subtitleTranslations = RegExp(
+    r"^(Subtitle|Altyazı|Azpititulua|Binnivîs/OSD|Emitwe|Felirat|Fo-thiotal|Fotheideal|Gagana fa'aliliu|Isdeitlau|Istitl|Izihlokwana|Legenda|Legendas|Lestiitol|Napisy|Omutwe ogwokubiri|Onderskrif|Ondertitel|Phụ đề|Podnapisi|Podnaslov|Podtitl|Sarikata|Sortite|Sostítols|Sot titul|Sottotitoli|Sottutitulu|Sous-titres|Subtiiter|Subtitlu|Subtitol|Subtitr|Subtitrai|Subtitrs|Subtitulo|Subtítol|Subtítulo|Subtítulos|Subtítulu|Tekstitys|Terjemahan|Texti|Titra|Titulky|Titulky|Undertekst|Undertext|Undertitel|Υπότιτλος|Дэд бичвэр|Превод|Субтитр|Субтитри|Субтитрлер|Субтитры|Субтитрі|Субтытры|Титл|Ենթագիր|अनुवाद पट्टी|उपशीर्षक|दालाय-बिमुं|উপশিৰোনাম|বিকল্প নাম|সাবটাইটেল|ਸਬ-ਟਾਈਟਲ|ઉપશીર્ષક|ଉପଟାଇଟେଲ୍‌|துணை உரை|ఉపశీర్షిక|ಉಪಶೀರ್ಷಿಕೆ|ഉപശീര്‍ഷകം|උපසිරැසි|บทบรรยาย|စာတန်းထိုး|ტიტრები|ንዑስ አርእስት|ጽሁፋዊ ትርጉሞች|ចំណង​ជើង​រង|字幕|자막)$");
+
+var _typeTranslations = RegExp(
+    r"^(Type|Cineál|Cure|Ekyika|Fannu|Handiika|Itū'āiga|Jenis|Kite|Liik|Loại|Math|Mota|Rizh|Seòrsa|Sôre|Tegund|Tip|Tipas|Tipe|Tipi|Tipo|Tips|Tipu|Tipus|Turi|Typ|Typo|Tyyppi|Típus|Tür|Uhlobo|Vrsta|Τύπος|Врста|Тип|Түрі|Түрү|Төр|Төрөл|Տեսակ|סוג|تىپى|جۆر|نوع|ٹایِپ|ډول|टंकलेखन करा|टाइप|प्रकार|रोखोम|ধরন|প্রকার|প্ৰকাৰ|ਟਾਈਪ|પ્રકાર|ପ୍ରକାର|வகை|రకం|ಪ್ರಕಾರ|തരം|වර්ගය|ประเภท|အမျိုးအစား|ტიპი|አይነት|ប្រភេទ|タイプ|类型|類型|형식)$");
+
 enum OperatingSystem { linux, macos, windows }
 
 Map<OperatingSystem, String> osNames = {
@@ -305,14 +320,14 @@ class VlcStatusResponse {
 
   List<LanguageTrack> get audioTracks {
     if (_audioTracks == null) {
-      _audioTracks = _getLanguageTracks('Audio');
+      _audioTracks = _getLanguageTracks(_audioTranslations);
     }
     return _audioTracks;
   }
 
   List<LanguageTrack> get subtitleTracks {
     if (_subtitleTracks == null) {
-      _subtitleTracks = _getLanguageTracks('Subtitle');
+      _subtitleTracks = _getLanguageTracks(_subtitleTranslations);
     }
     return _subtitleTracks;
   }
@@ -344,19 +359,31 @@ class VlcStatusResponse {
     return equalizer;
   }
 
-  List<LanguageTrack> _getLanguageTracks(String type) {
+  List<LanguageTrack> _getLanguageTracks(RegExp type) {
     List<LanguageTrack> tracks = [];
     document.findAllElements('category').forEach((category) {
       Map<String, String> info = Map.fromIterable(category.findElements('info'),
           key: (info) => info.getAttribute('name'), value: (info) => info.text);
-      if (info['Type'] == type) {
-        var language = info['Language'];
-        if (language == null || language.isEmpty) {
+      var typeKey = info.keys.firstWhere(
+          (key) => _typeTranslations.hasMatch(key.trim()),
+          orElse: () => null);
+      if (typeKey != null && type.hasMatch(info[typeKey].trim())) {
+        var languageKey = info.keys.firstWhere(
+            (key) => _languageTranslations.hasMatch(key.trim()),
+            orElse: () => null);
+        if (languageKey == null) {
           return;
         }
-        var description = info['Description'];
+        var language = info[languageKey];
+        if (language.isEmpty) {
+          return;
+        }
+        var descriptionKey = info.keys.firstWhere(
+            (key) => _descriptionTranslations.hasMatch(key.trim()),
+            orElse: () => null);
         var name = language;
-        if (description != null && description.isNotEmpty) {
+        if (descriptionKey != null && info[descriptionKey].isNotEmpty) {
+          var description = info[descriptionKey];
           if (description.startsWith(language)) {
             name = description;
           } else {
