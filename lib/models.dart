@@ -15,6 +15,9 @@ var _audioExtensions = RegExp(
 var _audioTranslations = RegExp(
     r"^(Audio|_Audio|Ameslaw|Aodio|Audioa|Audiu|Deng|Dźwięk|Ekirikuhurirwa|Endobozi|Fuaim|Fuaim|Garsas|Hang|Hljóð|Leo|Ljud|Lyd|M_adungan|Ma giwinyo|Odio|Ojoo|Oudio|Ovoz|Sain|Ses|Sonido|Səs|Umsindo|Zvok|Zvuk|Zëri|Àudio|Áudio|Ääni|Ήχος|Аудио|Аўдыё|Дуу|Дыбыс|Звук|Ձայն|שמע|آڈیو, صدا|ئۈن|آڈیو|دەنگ|صدا|غږيز|अडिअ'|अडियो|आडियो|ध्वनी|অডিঅ'|অডিও|ਆਡੀਓ|ઓડિયો|ଅଡ଼ିଓ|ஒலி|శ్రవ్యకం|ಧ್ವನಿ|ഓഡിയോ|ශ්‍රව්‍ය|เสียง|အသံ|აუდიო|ተሰሚ|ድምፅ|អូឌីយ៉ូ|オーディオ|音訊|音频|오디오)$");
 
+var _codecTranslations = RegExp(
+    r"^(Codec|Bonez|Codifica|Codificador|Cudecu|Còdec|Códec|Dekko|Enkusike|i-Codec|Kodavimas|Kodek|Kodeka|Kodeks|Kodlayıcı/Çözücü|Koodek|Koodekki|Kóðalykill (codec)|Kôdek|Scéim Comhbhrúite|Кодек|Кодэк|Կոդեկ|מקודד/מפענח|كود يەشكۈچ|كوديك|کوڈیک|کوډېک|کُدک|کۆدێک|कोडेक|কোডেক|કોડેક|କୋଡେକ୍|கோடக்|కొడెక్|ಸಂಕೇತಕ|കോഡെക്ക്|කොඩෙක්|ตัวอ่าน-ลงรหัส|კოდეკი|ኮዴክ|កូដិក|コーデック|編解碼器|编解码器|코덱)$");
+
 var _descriptionTranslations = RegExp(
     r"^(Description|Apraksts|Aprašymas|Açıklama|Beschreibung|Beschrijving|Beskriuwing|Beskrivelse|Beskrivning|Beskrywing|Cifagol|Cur síos|Descrición|Descriere|Descripcion|Descripció|Descripción|Descrizion|Descrizione|Descrição|Deskribapena|Deskripsi|Deskrivadur|Discrijhaedje|Discrizzione|Disgrifiad|Ennyinyonyola|Enshoborora|Fa'amatalaga|Hedef|Incazelo|Keterangan|Kirjeldus|Kuvaus|Leírás|Lýsing|Mô tả|Opis|Popis|Përshkrimi|Skildring|Ta’rifi|Te lok|Tuairisgeul|Περιγραφή|Апісанне|Баяндама|Опис|Описание|Сипаттама|Тайлбар|Тасвирлама|Նկարագրություն|תיאור|الوصف|سپړاوی|شرح|وضاحت|پەسن|چۈشەندۈرۈش|बेखेवथि|वर्णन|विवरण|বর্ণনা|বিবরণ|বিৱৰণ|ਵੇਰਵਾ|વર્ણન|ବିବରଣୀ|விவரம்|వివరణ|ವಿವರಣೆ|വിവരണം|විස්තරය|รายละเอียด|ဖော်ပြချက်|აღწერილობა|መግለጫ|សេចក្ដី​ពណ៌នា|描述|說明|説明|설명)$");
 
@@ -367,35 +370,45 @@ class VlcStatusResponse {
       var typeKey = info.keys.firstWhere(
           (key) => _typeTranslations.hasMatch(key.trim()),
           orElse: () => null);
-      if (typeKey != null && type.hasMatch(info[typeKey].trim())) {
-        var languageKey = info.keys.firstWhere(
-            (key) => _languageTranslations.hasMatch(key.trim()),
-            orElse: () => null);
-        if (languageKey == null) {
-          return;
-        }
-        var language = info[languageKey];
-        if (language.isEmpty) {
-          return;
-        }
-        var descriptionKey = info.keys.firstWhere(
-            (key) => _descriptionTranslations.hasMatch(key.trim()),
-            orElse: () => null);
-        var name = language;
-        if (descriptionKey != null && info[descriptionKey].isNotEmpty) {
-          var description = info[descriptionKey];
-          if (description.startsWith(language)) {
-            name = description;
-          } else {
-            name = '$description [$language]';
-          }
-        }
-        tracks.add(LanguageTrack(
-            name, int.parse(category.getAttribute('name').split(' ').last)));
+      if (typeKey == null || !type.hasMatch(info[typeKey].trim())) {
+        return;
       }
+
+      var streamName = category.getAttribute('name');
+      var streamNumber = int.tryParse(streamName.split(' ').last);
+      if (streamNumber == null) {
+        return;
+      }
+
+      var codec = _getStreamInfoItem(info, _codecTranslations);
+      var description = _getStreamInfoItem(info, _descriptionTranslations);
+      var language = _getStreamInfoItem(info, _languageTranslations);
+
+      String name = streamName;
+      if (description != null && language != null) {
+        if (description.startsWith(language)) {
+          name = description;
+        } else {
+          name = '$description [$language]';
+        }
+      } else if (language != null) {
+        name = language;
+      } else if (description != null) {
+        name = description;
+      } else if (codec != null) {
+        name = codec;
+      }
+
+      tracks.add(LanguageTrack(name, streamNumber));
     });
     tracks.sort((a, b) => a.streamNumber - b.streamNumber);
     return tracks;
+  }
+
+  String _getStreamInfoItem(Map<String, String> info, RegExp name) {
+    var key = info.keys
+        .firstWhere((key) => name.hasMatch(key.trim()), orElse: () => null);
+    return (key != null && info[key].isNotEmpty) ? info[key] : null;
   }
 
   String toString() {
