@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:connectivity/connectivity.dart';
@@ -779,6 +780,20 @@ class _RemoteControlState extends State<RemoteControl> {
     return rate.clamp(0.25, 4.0);
   }
 
+  _decrementRate(setState) {
+    setState(() {
+      _rate = math.max(0.25, ((_rate - 0.1) * 10.0).roundToDouble() / 10.0);
+      _setRate(_rate);
+    });
+  }
+
+  _incrementRate(setState) {
+    setState(() {
+      _rate = math.min(4.0, ((_rate + 0.1) * 10.0).roundToDouble() / 10.0);
+      _setRate(_rate);
+    });
+  }
+
   _showPlaybackSpeedControl() {
     var theme = Theme.of(context);
     showModalBottomSheet(
@@ -872,14 +887,11 @@ class _RemoteControlState extends State<RemoteControl> {
                               child: IconButton(
                                 color: Colors.black,
                                 icon: Icon(Icons.keyboard_arrow_up),
-                                onPressed: () {
-                                  setState(() {
-                                    _rate =
-                                        ((_rate + 0.1) * 10.0).roundToDouble() /
-                                            10.0;
-                                    _setRate(_rate);
-                                  });
-                                },
+                                onPressed: _rate < 4.0
+                                    ? () {
+                                        _incrementRate(setState);
+                                      }
+                                    : null,
                               ),
                             ),
                           ),
@@ -893,14 +905,11 @@ class _RemoteControlState extends State<RemoteControl> {
                               child: IconButton(
                                 color: Colors.black,
                                 icon: Icon(Icons.keyboard_arrow_down),
-                                onPressed: () {
-                                  setState(() {
-                                    _rate =
-                                        ((_rate - 0.1) * 10.0).roundToDouble() /
-                                            10.0;
-                                    _setRate(_rate);
-                                  });
-                                },
+                                onPressed: _rate > 0.25
+                                    ? () {
+                                        _decrementRate(setState);
+                                      }
+                                    : null,
                               ),
                             ),
                           ),
