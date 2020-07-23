@@ -1190,7 +1190,7 @@ class _RemoteControlState extends State<RemoteControl> {
                 dense: widget.settings.dense,
                 title: Text(
                   _playing == null && _title.isEmpty
-                      ? 'VLC Remote 1.4.1'
+                      ? 'VLC Remote 1.4.2'
                       : _playing?.title ??
                           cleanVideoTitle(_title.split(RegExp(r'[\\/]')).last),
                   overflow: TextOverflow.ellipsis,
