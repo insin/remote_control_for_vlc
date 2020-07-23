@@ -1530,7 +1530,7 @@ class _RemoteControlState extends State<RemoteControl> {
                           ],
                         ),
                       )
-                    : ConnectionAnimation(),
+                    : ConnectionAnimation(showSettings: _showSettings),
               ),
             ),
           Positioned(
@@ -1863,6 +1863,10 @@ class _RemoteControlState extends State<RemoteControl> {
 }
 
 class ConnectionAnimation extends StatefulWidget {
+  final VoidCallback showSettings;
+
+  ConnectionAnimation({this.showSettings});
+
   @override
   State<StatefulWidget> createState() => _ConnectionAnimationState();
 }
@@ -1893,6 +1897,7 @@ class _ConnectionAnimationState extends State<ConnectionAnimation>
 
   @override
   Widget build(BuildContext context) {
+    var theme = Theme.of(context);
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1919,6 +1924,13 @@ class _ConnectionAnimationState extends State<ConnectionAnimation>
           ),
           SizedBox(height: 16),
           Text('Trying to connect to VLC…'),
+          SizedBox(height: 16),
+          IconButton(
+            color: theme.textTheme.caption.color,
+            iconSize: 48,
+            icon: Icon(Icons.settings),
+            onPressed: widget.showSettings,
+          )
         ],
       ),
     );
