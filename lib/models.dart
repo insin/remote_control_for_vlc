@@ -233,6 +233,13 @@ class LanguageTrack {
   }
 }
 
+class AspectRatioOption {
+  String name;
+  String value;
+
+  AspectRatioOption(this.name, this.value);
+}
+
 class Equalizer {
   bool enabled;
   List<Preset> presets;
