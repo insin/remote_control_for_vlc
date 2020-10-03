@@ -27,14 +27,14 @@ const _tickIntervalSeconds = 1;
 const _sliderThrottleMilliseconds = 333;
 
 enum _PopupMenuChoice {
+  ASPECT_RATIO,
   AUDIO_TRACK,
   EMPTY_PLAYLIST,
   FULLSCREEN,
   PLAYBACK_SPEED,
   SETTINGS,
   SNAPSHOT,
-  SUBTITLE_TRACK,
-  ASPECT_RATIO
+  SUBTITLE_TRACK
 }
 
 class RemoteControl extends StatefulWidget {
@@ -624,6 +624,9 @@ class _RemoteControlState extends State<RemoteControl> {
   //#region Popup menu
   _onPopupMenuChoice(_PopupMenuChoice choice) {
     switch (choice) {
+      case _PopupMenuChoice.ASPECT_RATIO:
+        _chooseAspectRatio();
+        break;
       case _PopupMenuChoice.AUDIO_TRACK:
         _chooseAudioTrack();
         break;
@@ -644,9 +647,6 @@ class _RemoteControlState extends State<RemoteControl> {
         break;
       case _PopupMenuChoice.SUBTITLE_TRACK:
         _chooseSubtitleTrack();
-        break;
-      case _PopupMenuChoice.ASPECT_RATIO:
-        _chooseAspectRatio();
         break;
     }
   }
