@@ -27,6 +27,7 @@ const _tickIntervalSeconds = 1;
 const _sliderThrottleMilliseconds = 333;
 
 enum _PopupMenuChoice {
+  ASPECT_RATIO,
   AUDIO_TRACK,
   EMPTY_PLAYLIST,
   FULLSCREEN,
@@ -623,6 +624,9 @@ class _RemoteControlState extends State<RemoteControl> {
   //#region Popup menu
   _onPopupMenuChoice(_PopupMenuChoice choice) {
     switch (choice) {
+      case _PopupMenuChoice.ASPECT_RATIO:
+        _chooseAspectRatio();
+        break;
       case _PopupMenuChoice.AUDIO_TRACK:
         _chooseAudioTrack();
         break;
@@ -698,6 +702,44 @@ class _RemoteControlState extends State<RemoteControl> {
         'val': audioTrack.streamNumber.toString(),
       });
     }
+  }
+
+  List<AspectRatioOption> _getAspectRatioOptions() {
+    return [
+      new AspectRatioOption("(Default)", ""),
+      new AspectRatioOption("16:9", "16:9"),
+      new AspectRatioOption("4:3", "4:3"),
+      new AspectRatioOption("1:1", "1:1"),
+      new AspectRatioOption("16:10", "16:10"),
+      new AspectRatioOption("2.21:1", "221:100"),
+      new AspectRatioOption("2.35:1", "235:100"),
+      new AspectRatioOption("2.39:1", "239:100"),
+      new AspectRatioOption("5:4", "5:4"),
+    ];
+  }
+
+  _chooseAspectRatio() {
+    List<AspectRatioOption> options = _getAspectRatioOptions();
+    var dialogOptions = options
+        .map((option) => SimpleDialogOption(
+              onPressed: () {
+                _statusRequest({
+                  'command': 'aspectratio',
+                  'val': option.value,
+                });
+                Navigator.pop(context);
+              },
+              child: Text(option.name),
+            ))
+        .toList();
+    return showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return SimpleDialog(
+          children: dialogOptions,
+        );
+      },
+    );
   }
 
   _toggleEqualizer() {
@@ -1255,6 +1297,18 @@ class _RemoteControlState extends State<RemoteControl> {
                               enabled: (_lastStatusResponse?.audioTracks ?? [])
                                       .length >
                                   1,
+                            ),
+                            PopupMenuItem(
+                              child: ListTile(
+                                dense: widget.settings.dense,
+                                leading: Icon(Icons.aspect_ratio),
+                                title: Text('Aspect ratio'),
+                                enabled: _playing != null &&
+                                    (_playing.isVideo || _playing.isWeb),
+                              ),
+                              value: _PopupMenuChoice.ASPECT_RATIO,
+                              enabled: _playing != null &&
+                                  (_playing.isVideo || _playing.isWeb),
                             ),
                             PopupMenuItem(
                               child: ListTile(
