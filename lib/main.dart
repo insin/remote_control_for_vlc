@@ -69,7 +69,7 @@ class VlcRemote extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
-      title: 'VLC Remote',
+      title: 'Remote Control for VLC',
       theme: ThemeData(
         primarySwatch: Colors.deepOrange,
       ),

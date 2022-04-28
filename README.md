@@ -1,21 +1,21 @@
-# VLC Remote
+# Remote Control for VLC
 
 A [VLC](https://www.videolan.org/vlc/) remote control written with [Flutter](https://flutter.io/).
 
 ## Initial Setup Guides
 
-The first time you start VLC Remote, it will provide a guide to setting up VLC's web interface
+The first time you start Remote Control for VLC, it will provide a guide to setting up VLC's web interface
  for remote control and will give you the option to try to discover the IP of the host VLC is
   running on automatically.
 
 The app's guides for initial VLC configuration and finding your host IP if it can't be found
  automatically are also available here if you need to reference them on a computer:
 
-### [VLC Remote Configuration Guides](https://codepen.io/jbscript/full/BaoVYYK)
+### [Remote Control for VLC Configuration Guides](https://codepen.io/jbscript/full/BaoVYYK)
 
 ## Demo
 
-[![Demo of VLC Remote being used](https://img.youtube.com/vi/8eXJX4GVGhA/0.jpg)](https://www.youtube.com/watch?v=8eXJX4GVGhA)
+[![Demo of Remote Control for VLC being used](https://img.youtube.com/vi/8eXJX4GVGhA/0.jpg)](https://www.youtube.com/watch?v=8eXJX4GVGhA)
 
 ## Screenshots
 

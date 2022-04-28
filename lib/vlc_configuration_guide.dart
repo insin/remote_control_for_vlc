@@ -147,7 +147,7 @@ class _VlcConfigurationGuideState extends State<VlcConfigurationGuide> {
               Text('Set a password in the "Lua HTTP" section:'),
               Image.asset('assets/$os-password.png'),
               Text(
-                  'VLC Remote uses the password "vlcplayer" (without quotes) by default – if you set something else you\'ll have to manually configure the VLC connection.'),
+                  'Remote Control for VLC uses the password "vlcplayer" (without quotes) by default – if you set something else you\'ll have to manually configure the VLC connection.'),
               Text('Finally, click Save to save your changes.'),
             ],
           ),
@@ -218,7 +218,7 @@ class _VlcConfigurationGuideState extends State<VlcConfigurationGuide> {
                   'At the bottom of the "Interface" settings page, check "Enable HTTP web interface" and set a password.'),
               Image.asset('assets/mac-http-interface.png'),
               Text(
-                  'VLC Remote uses the password "vlcplayer" (without quotes) by default – if you set something else you\'ll have to manually configure the VLC connection.'),
+                  'Remote Control for VLC uses the password "vlcplayer" (without quotes) by default – if you set something else you\'ll have to manually configure the VLC connection.'),
               Text('Finally, click Save to save your changes.'),
             ],
           ),

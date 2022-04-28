@@ -177,7 +177,7 @@ class _RemoteControlState extends State<RemoteControl> {
       builder: (context) => AlertDialog(
         title: Text('Turn on Wi-Fi'),
         content: Text(
-          'A Wi-Fi connection was not detected.\n\nVLC Remote needs to connect to your local network to control VLC.',
+          'A Wi-Fi connection was not detected.\n\nRemote Control for VLC needs to connect to your local network to control VLC.',
         ),
       ),
     );
@@ -1190,7 +1190,7 @@ class _RemoteControlState extends State<RemoteControl> {
                 dense: widget.settings.dense,
                 title: Text(
                   _playing == null && _title.isEmpty
-                      ? 'VLC Remote 1.4.2'
+                      ? 'Remote Control for VLC 1.4.3'
                       : _playing?.title ??
                           cleanVideoTitle(_title.split(RegExp(r'[\\/]')).last),
                   overflow: TextOverflow.ellipsis,
@@ -1336,7 +1336,8 @@ class _RemoteControlState extends State<RemoteControl> {
     if (!widget.settings.connection.hasIp) {
       return Expanded(
         child: ListView(padding: EdgeInsets.all(16), children: [
-          Text('VLC Remote Setup', style: theme.textTheme.headline5),
+          Text('Remote Control for VLC Setup',
+              style: theme.textTheme.headline5),
           SizedBox(height: 16),
           Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text('1. VLC configuration', style: headingStyle),
