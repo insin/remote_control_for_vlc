@@ -4,13 +4,15 @@ import 'models.dart';
 import 'widgets.dart';
 
 class VlcConfigurationGuide extends StatefulWidget {
+  const VlcConfigurationGuide({Key? key}) : super(key: key);
+
   @override
   _VlcConfigurationGuideState createState() => _VlcConfigurationGuideState();
 }
 
 class _VlcConfigurationGuideState extends State<VlcConfigurationGuide> {
   int _currentStep = 0;
-  OperatingSystem _os;
+  OperatingSystem? _os;
 
   _onOsChanged(os) {
     setState(() {
@@ -26,9 +28,9 @@ class _VlcConfigurationGuideState extends State<VlcConfigurationGuide> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: <Widget>[
-            Text('VLC Configuration Guide'),
+            const Text('VLC Configuration Guide'),
             if (_os != null)
-              Text('for ${osNames[_os]}', style: TextStyle(fontSize: 13)),
+              Text('for ${osNames[_os]}', style: const TextStyle(fontSize: 13)),
           ],
         ),
       ),
@@ -36,41 +38,38 @@ class _VlcConfigurationGuideState extends State<VlcConfigurationGuide> {
     );
   }
 
-  // ignore: missing_return
   Widget buildBody() {
-    var theme = Theme.of(context);
-    if (_os == null) {
-      return Column(
-        children: <Widget>[
-          Padding(
-            padding: EdgeInsets.all(24),
-            child: Wrap(
-              runSpacing: 16,
-              children: [
-                Text('Which operating system are you running VLC on?',
-                    style: theme.textTheme.subtitle1),
-                Column(
-                    children: OperatingSystem.values
-                        .map((os) => RadioListTile(
-                              title: Text(osNames[os]),
-                              value: os,
-                              groupValue: _os,
-                              onChanged: _onOsChanged,
-                            ))
-                        .toList())
-              ],
+    switch (_os) {
+      case OperatingSystem.macos:
+        return buildMacStepper();
+      case OperatingSystem.linux:
+      case OperatingSystem.windows:
+        return buildLinuxWindowsStepper();
+      default:
+        var theme = Theme.of(context);
+        return Column(
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Wrap(
+                runSpacing: 16,
+                children: [
+                  Text('Which operating system are you running VLC on?',
+                      style: theme.textTheme.subtitle1),
+                  Column(
+                      children: OperatingSystem.values
+                          .map((os) => RadioListTile(
+                                title: Text(osNames[os]!),
+                                value: os,
+                                groupValue: _os,
+                                onChanged: _onOsChanged,
+                              ))
+                          .toList())
+                ],
+              ),
             ),
-          ),
-        ],
-      );
-    }
-
-    if (_os == OperatingSystem.macos) {
-      return buildMacStepper();
-    }
-
-    if (_os == OperatingSystem.linux || _os == OperatingSystem.windows) {
-      return buildLinuxWindowsStepper();
+          ],
+        );
     }
   }
 
@@ -79,20 +78,21 @@ class _VlcConfigurationGuideState extends State<VlcConfigurationGuide> {
     var os = _os.toString().split('.').last;
     return Stepper(
       currentStep: _currentStep,
-      controlsBuilder: (BuildContext context,
-          {VoidCallback onStepContinue, VoidCallback onStepCancel}) {
+      controlsBuilder: (BuildContext context, ControlsDetails details) {
         return Padding(
           padding: const EdgeInsets.only(top: 16),
           child: Row(
             children: <Widget>[
-              FlatButton(
-                color: theme.primaryColor,
-                textColor: Colors.white,
-                onPressed: onStepContinue,
+              TextButton(
+                style: TextButton.styleFrom(
+                  backgroundColor: theme.primaryColor,
+                  primary: Colors.white,
+                ),
+                onPressed: details.onStepContinue,
                 child: Text(_currentStep == 2 ? 'FINISHED' : 'NEXT STEP'),
               ),
-              FlatButton(
-                onPressed: onStepCancel,
+              TextButton(
+                onPressed: details.onStepCancel,
                 child: const Text('PREVIOUS STEP'),
               ),
             ],
@@ -119,43 +119,43 @@ class _VlcConfigurationGuideState extends State<VlcConfigurationGuide> {
       },
       steps: [
         Step(
-          title: Text('Enable VLC\'s web interface'),
+          title: const Text('Enable VLC\'s web interface'),
           content: TextAndImages(
             children: <Widget>[
-              Text(
+              const Text(
                   'In VLC\'s menu bar, select Tools > Preferences to open the preferences window:'),
               Image.asset('assets/$os-menu.png'),
-              Text(
+              const Text(
                   'Switch to Advanced Preferences mode by clicking the "All" radio button in the "Show settings" section at the bottom left of the window:'),
               Image.asset('assets/$os-show-settings.png'),
-              Text(
+              const Text(
                   'Scroll down to find the "Main interfaces" section and click it:'),
               Image.asset('assets/$os-main-interface.png'),
-              Text(
+              const Text(
                   'Check the "Web" checkbox in the "Extra interface modules" section to enable the web interface:'),
               Image.asset('assets/$os-web.png'),
             ],
           ),
         ),
         Step(
-          title: Text('Set web interface password'),
+          title: const Text('Set web interface password'),
           content: TextAndImages(
             children: <Widget>[
-              Text(
+              const Text(
                   'Expand the "Main interfaces" section by clicking the ">" chevron and click the "Lua" section which appears:'),
               Image.asset('assets/$os-lua.png'),
-              Text('Set a password in the "Lua HTTP" section:'),
+              const Text('Set a password in the "Lua HTTP" section:'),
               Image.asset('assets/$os-password.png'),
-              Text(
+              const Text(
                   'Remote Control for VLC uses the password "vlcplayer" (without quotes) by default – if you set something else you\'ll have to manually configure the VLC connection.'),
-              Text('Finally, click Save to save your changes.'),
+              const Text('Finally, click Save to save your changes.'),
             ],
           ),
         ),
         Step(
-          title: Text('Close and restart VLC'),
+          title: const Text('Close and restart VLC'),
           content: Row(
-            children: <Widget>[
+            children: const <Widget>[
               Text('Close and restart VLC to activate the web interface.'),
             ],
           ),
@@ -168,20 +168,21 @@ class _VlcConfigurationGuideState extends State<VlcConfigurationGuide> {
     var theme = Theme.of(context);
     return Stepper(
       currentStep: _currentStep,
-      controlsBuilder: (BuildContext context,
-          {VoidCallback onStepContinue, VoidCallback onStepCancel}) {
+      controlsBuilder: (BuildContext context, ControlsDetails details) {
         return Padding(
           padding: const EdgeInsets.only(top: 16),
           child: Row(
             children: <Widget>[
-              FlatButton(
-                color: theme.primaryColor,
-                textColor: Colors.white,
-                onPressed: onStepContinue,
+              TextButton(
+                style: TextButton.styleFrom(
+                  backgroundColor: theme.primaryColor,
+                  primary: Colors.white,
+                ),
+                onPressed: details.onStepContinue,
                 child: Text(_currentStep == 1 ? 'FINISHED' : 'NEXT STEP'),
               ),
-              FlatButton(
-                onPressed: onStepCancel,
+              TextButton(
+                onPressed: details.onStepCancel,
                 child: const Text('PREVIOUS STEP'),
               ),
             ],
@@ -208,25 +209,25 @@ class _VlcConfigurationGuideState extends State<VlcConfigurationGuide> {
       },
       steps: [
         Step(
-          title: Text('Enable VLC\'s web interface'),
+          title: const Text('Enable VLC\'s web interface'),
           content: TextAndImages(
             children: <Widget>[
-              Text(
+              const Text(
                   'In the Menubar, select VLC > Preferences to open the preferences window:'),
               Image.asset('assets/mac-menu.png'),
-              Text(
+              const Text(
                   'At the bottom of the "Interface" settings page, check "Enable HTTP web interface" and set a password.'),
               Image.asset('assets/mac-http-interface.png'),
-              Text(
+              const Text(
                   'Remote Control for VLC uses the password "vlcplayer" (without quotes) by default – if you set something else you\'ll have to manually configure the VLC connection.'),
-              Text('Finally, click Save to save your changes.'),
+              const Text('Finally, click Save to save your changes.'),
             ],
           ),
         ),
         Step(
-          title: Text('Quit and restart VLC'),
+          title: const Text('Quit and restart VLC'),
           content: Row(
-            children: <Widget>[
+            children: const <Widget>[
               Text('Quit and restart VLC to activate the web interface.'),
             ],
           ),

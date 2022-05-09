@@ -9,7 +9,9 @@ class EnqueueMenuGestureDetector extends StatefulWidget {
   final Widget child;
   final BrowseItem item;
 
-  EnqueueMenuGestureDetector({@required this.child, @required this.item});
+  const EnqueueMenuGestureDetector(
+      {Key? key, required this.child, required this.item})
+      : super(key: key);
 
   @override
   _EnqueueMenuGestureDetectorState createState() =>
@@ -18,28 +20,28 @@ class EnqueueMenuGestureDetector extends StatefulWidget {
 
 class _EnqueueMenuGestureDetectorState
     extends State<EnqueueMenuGestureDetector> {
-  Offset _tapPosition;
+  late Offset _tapPosition;
 
   _handleTapDown(details) {
     _tapPosition = details.globalPosition;
   }
 
   _showMenu() async {
-    final RenderBox overlay = Overlay.of(context).context.findRenderObject();
+    final Size size = Overlay.of(context)!.context.size!;
     var intent = await showMenu(
       context: context,
       items: <PopupMenuItem<BrowseResultIntent>>[
-        PopupMenuItem(
+        const PopupMenuItem(
           child: Text('Play'),
           value: BrowseResultIntent.play,
         ),
-        PopupMenuItem(
+        const PopupMenuItem(
           child: Text('Enqueue'),
           value: BrowseResultIntent.enqueue,
         ),
       ],
       position: RelativeRect.fromRect(
-          _tapPosition & Size(40, 40), Offset.zero & overlay.size),
+          _tapPosition & const Size(40, 40), Offset.zero & size),
     );
     if (intent != null) {
       Navigator.pop(context, BrowseResult(widget.item, intent));
@@ -60,14 +62,15 @@ class _EnqueueMenuGestureDetectorState
 ///
 /// From https://github.com/flutter/flutter/issues/37057#issuecomment-516048356
 class FullWidthTrackShape extends RoundedRectSliderTrackShape {
+  @override
   Rect getPreferredRect({
-    @required RenderBox parentBox,
+    required RenderBox parentBox,
     Offset offset = Offset.zero,
-    @required SliderThemeData sliderTheme,
+    required SliderThemeData sliderTheme,
     bool isEnabled = false,
     bool isDiscrete = false,
   }) {
-    final double trackHeight = sliderTheme.trackHeight;
+    final double trackHeight = sliderTheme.trackHeight!;
     final double trackLeft = offset.dx;
     final double trackTop =
         offset.dy + (parentBox.size.height - trackHeight) / 2;
@@ -86,12 +89,12 @@ String intl(String enUsString) {
       !_intlStrings.containsKey(enUsString)) {
     return enUsString;
   }
-  return _intlStrings[enUsString];
+  return _intlStrings[enUsString]!;
 }
 
 /// Like [Iterable.join] but for lists of Widgets.
 Iterable<Widget> intersperseWidgets(Iterable<Widget> iterable,
-    {Widget Function() builder}) sync* {
+    {required Widget Function() builder}) sync* {
   final iterator = iterable.iterator;
   if (iterator.moveNext()) {
     yield iterator.current;
@@ -105,7 +108,7 @@ Iterable<Widget> intersperseWidgets(Iterable<Widget> iterable,
 /// A [WhitelistingTextInputFormatter] that takes in digits `[0-9]` and periods
 /// `.` only.
 var ipWhitelistingTextInputFormatter =
-    WhitelistingTextInputFormatter(RegExp(r'[\d.]+'));
+    FilteringTextInputFormatter.allow(RegExp(r'[\d.]+'));
 
 /// Remove current focus to hide the keyboard.
 removeCurrentFocus(BuildContext context) {
@@ -119,7 +122,8 @@ class TextAndImages extends StatelessWidget {
   final List<Widget> children;
   final double spacing;
 
-  TextAndImages({@required this.children, this.spacing = 16});
+  const TextAndImages({Key? key, required this.children, this.spacing = 16})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {

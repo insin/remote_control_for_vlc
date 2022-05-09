@@ -26,19 +26,20 @@ class OpenMedia extends StatefulWidget {
   final SharedPreferences prefs;
   final Settings settings;
 
-  OpenMedia({
-    @required this.prefs,
-    @required this.settings,
-  });
+  const OpenMedia({
+    Key? key,
+    required this.prefs,
+    required this.settings,
+  }) : super(key: key);
 
   @override
   State<StatefulWidget> createState() => _OpenMediaState();
 }
 
 class _OpenMediaState extends State<OpenMedia> with WidgetsBindingObserver {
-  List<BrowseItem> _faves;
-  BrowseItem _clipboardUrlItem;
-  String _otherUrl;
+  late List<BrowseItem> _faves;
+  BrowseItem? _clipboardUrlItem;
+  String? _otherUrl;
 
   @override
   initState() {
@@ -46,13 +47,13 @@ class _OpenMediaState extends State<OpenMedia> with WidgetsBindingObserver {
         .map((obj) => BrowseItem.fromJson(obj))
         .toList();
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance!.addObserver(this);
     _checkClipboard();
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
+    WidgetsBinding.instance!.removeObserver(this);
     super.dispose();
   }
 
@@ -64,27 +65,29 @@ class _OpenMediaState extends State<OpenMedia> with WidgetsBindingObserver {
   }
 
   _checkClipboard() async {
-    BrowseItem urlItem;
+    BrowseItem? urlItem;
     var data = await Clipboard.getData(Clipboard.kTextPlain);
-    if (data?.text != null &&
-        (data.text.startsWith(urlRegExp) ||
-            data.text.startsWith(probablyMediaUrlRegExp))) {
-      urlItem = BrowseItem.fromUrl(data.text);
+    if (data != null &&
+        data.text != null &&
+        (data.text!.startsWith(urlRegExp) ||
+            data.text!.startsWith(probablyMediaUrlRegExp))) {
+      urlItem = BrowseItem.fromUrl(data.text!);
     }
     setState(() {
       _clipboardUrlItem = urlItem;
     });
   }
 
-  String get _displayUrl => _clipboardUrlItem.uri
+  String get _displayUrl => _clipboardUrlItem!.uri
       .replaceFirst(urlRegExp, '')
       .replaceFirst(wwwRegexp, '');
 
   _handleOtherUrl(intent) {
-    if (_otherUrl == null || _otherUrl.isEmpty) {
+    if (_otherUrl == null || _otherUrl!.isEmpty) {
       return;
     }
-    Navigator.pop(context, BrowseResult(BrowseItem.fromUrl(_otherUrl), intent));
+    Navigator.pop(
+        context, BrowseResult(BrowseItem.fromUrl(_otherUrl!), intent));
   }
 
   bool _isFave(BrowseItem item) {
@@ -104,7 +107,7 @@ class _OpenMediaState extends State<OpenMedia> with WidgetsBindingObserver {
   }
 
   _selectFile(BrowseItem dir) async {
-    BrowseResult result = await Navigator.push(
+    BrowseResult? result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => FileBrowser(
@@ -125,37 +128,37 @@ class _OpenMediaState extends State<OpenMedia> with WidgetsBindingObserver {
     List<Widget> listItems = <Widget>[
       ListTile(
         dense: widget.settings.dense,
-        title: Text('File System'),
-        leading: Icon(Icons.folder),
+        title: const Text('File System'),
+        leading: const Icon(Icons.folder),
         onTap: () {
           _selectFile(fileSystemItem);
         },
       ),
       if (_clipboardUrlItem != null)
         EnqueueMenuGestureDetector(
-          item: _clipboardUrlItem,
+          item: _clipboardUrlItem!,
           child: ListTile(
             dense: widget.settings.dense,
-            title: Text('Copied URL'),
+            title: const Text('Copied URL'),
             subtitle: Text(_displayUrl),
-            leading: Icon(Icons.public),
+            leading: const Icon(Icons.public),
             onTap: () {
               Navigator.pop(context,
-                  BrowseResult(_clipboardUrlItem, BrowseResultIntent.play));
+                  BrowseResult(_clipboardUrlItem!, BrowseResultIntent.play));
             },
           ),
         ),
       ExpansionTile(
-        leading: Icon(Icons.public),
+        leading: const Icon(Icons.public),
         title: Text('${_clipboardUrlItem != null ? 'Other ' : ''}URL'),
         children: [
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               children: [
                 TextFormField(
                   keyboardType: TextInputType.url,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     border: OutlineInputBorder(),
                     contentPadding: EdgeInsets.symmetric(horizontal: 12),
                   ),
@@ -168,16 +171,16 @@ class _OpenMediaState extends State<OpenMedia> with WidgetsBindingObserver {
                 Row(
                   children: <Widget>[
                     Expanded(
-                      child: RaisedButton(
-                        child: Text('Play'),
+                      child: ElevatedButton(
+                        child: const Text('Play'),
                         onPressed: () =>
                             _handleOtherUrl(BrowseResultIntent.play),
                       ),
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Expanded(
-                      child: RaisedButton(
-                        child: Text('Enqueue'),
+                      child: ElevatedButton(
+                        child: const Text('Enqueue'),
                         onPressed: () =>
                             _handleOtherUrl(BrowseResultIntent.enqueue),
                       ),
@@ -193,7 +196,7 @@ class _OpenMediaState extends State<OpenMedia> with WidgetsBindingObserver {
 
     if (_faves.isNotEmpty) {
       listItems.addAll([
-        Divider(),
+        const Divider(),
         ListTile(
           dense: widget.settings.dense,
           title: Text('Starred', style: Theme.of(context).textTheme.subtitle2),
@@ -201,11 +204,11 @@ class _OpenMediaState extends State<OpenMedia> with WidgetsBindingObserver {
       ]);
       listItems.addAll(_faves.map((item) => Dismissible(
             key: Key(item.path),
-            background: LeaveBehindView(),
+            background: const LeaveBehindView(),
             child: ListTile(
               dense: widget.settings.dense,
               title: Text(item.name),
-              leading: Icon(Icons.folder_special),
+              leading: const Icon(Icons.folder_special),
               onTap: () {
                 _selectFile(item);
               },
@@ -218,7 +221,7 @@ class _OpenMediaState extends State<OpenMedia> with WidgetsBindingObserver {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Open Media'),
+        title: const Text('Open Media'),
       ),
       body: ListView(children: listItems),
     );
@@ -226,7 +229,7 @@ class _OpenMediaState extends State<OpenMedia> with WidgetsBindingObserver {
 }
 
 class LeaveBehindView extends StatelessWidget {
-  LeaveBehindView({Key key}) : super(key: key);
+  const LeaveBehindView({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -234,7 +237,7 @@ class LeaveBehindView extends StatelessWidget {
       color: Colors.red,
       padding: const EdgeInsets.all(16.0),
       child: Row(
-        children: <Widget>[
+        children: const <Widget>[
           Icon(Icons.delete, color: Colors.white),
           Expanded(
             child: Text(''),

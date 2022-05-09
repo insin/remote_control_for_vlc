@@ -2,10 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:connectivity/connectivity.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:network_info_plus/network_info_plus.dart';
 
 import 'host_ip_guide.dart';
 import 'models.dart';
@@ -15,14 +16,16 @@ class SettingsScreen extends StatefulWidget {
   final Settings settings;
   final Function onSettingsChanged;
 
-  SettingsScreen({@required this.settings, @required this.onSettingsChanged});
+  const SettingsScreen(
+      {Key? key, required this.settings, required this.onSettingsChanged})
+      : super(key: key);
 
   @override
   State<StatefulWidget> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  Connection connection;
+  Connection connection = Connection();
   var ipController = TextEditingController();
   var ipFocus = FocusNode();
   bool ipDirty = false;
@@ -33,20 +36,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   var passwordFocus = FocusNode();
   bool passwordDirty = false;
 
-  String prefilledIpSuffix;
+  String? prefilledIpSuffix;
   bool showPassword = false;
 
   bool scanningNetwork = false;
 
   bool testingConnection = false;
-  String connectionTestResult;
-  String connectionTestResultDescription;
-  IconData connectionTestResultIcon;
+  String? connectionTestResult;
+  String? connectionTestResultDescription;
+  IconData? connectionTestResultIcon;
 
   @override
   initState() {
-    connection = Connection();
-
     ipController.addListener(() {
       setState(() {
         connection.ip = ipController.text;
@@ -109,11 +110,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   _defaultIpPrefix() async {
     if (await Connectivity().checkConnectivity() == ConnectivityResult.wifi) {
-      var ip = await Connectivity().getWifiIP();
-      setState(() {
-        prefilledIpSuffix = ip.substring(0, ip.lastIndexOf('.') + 1);
-        ipController.text = prefilledIpSuffix;
-      });
+      var ip = await NetworkInfo().getWifiIP();
+      if (ip != null) {
+        setState(() {
+          prefilledIpSuffix = ip.substring(0, ip.lastIndexOf('.') + 1);
+          ipController.text = prefilledIpSuffix!;
+        });
+      }
     }
   }
 
@@ -148,7 +151,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           headers: {
             'Authorization': 'Basic ' +
                 base64Encode(utf8.encode(':${passwordController.text}'))
-          }).timeout(Duration(seconds: 2));
+          }).timeout(const Duration(seconds: 2));
 
       if (response.statusCode == 200) {
         widget.settings.connection = connection;
@@ -186,14 +189,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final headingStyle = theme.textTheme.subtitle1
+    final headingStyle = theme.textTheme.subtitle1!
         .copyWith(fontWeight: FontWeight.bold, color: theme.primaryColor);
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
-        title: Text('Settings'),
+        title: const Text('Settings'),
       ),
       body: ListView(children: <Widget>[
         ListTile(
@@ -208,11 +212,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: TextField(
             controller: ipController,
             focusNode: ipFocus,
-            keyboardType: TextInputType.numberWithOptions(decimal: true),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [ipWhitelistingTextInputFormatter],
             decoration: InputDecoration(
               isDense: widget.settings.dense,
-              icon: Icon(Icons.computer),
+              icon: const Icon(Icons.computer),
               labelText: 'Host IP',
               errorText: ipDirty ? connection.ipError : null,
               helperText: prefilledIpSuffix != null &&
@@ -224,7 +228,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           trailing: IconButton(
             onPressed: () {
               Navigator.push(context,
-                  MaterialPageRoute(builder: (context) => HostIpGuide()));
+                  MaterialPageRoute(builder: (context) => const HostIpGuide()));
             },
             tooltip: 'Get help finding your IP',
             icon: Icon(Icons.help, color: theme.primaryColor),
@@ -238,7 +242,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             obscureText: !showPassword,
             decoration: InputDecoration(
               isDense: widget.settings.dense,
-              icon: Icon(Icons.vpn_key),
+              icon: const Icon(Icons.vpn_key),
               labelText: 'Password',
               errorText: passwordDirty ? connection.passwordError : null,
             ),
@@ -260,10 +264,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             controller: portController,
             focusNode: portFocus,
             keyboardType: TextInputType.number,
-            inputFormatters: [WhitelistingTextInputFormatter.digitsOnly],
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             decoration: InputDecoration(
                 isDense: widget.settings.dense,
-                icon: Icon(Icons.input),
+                icon: const Icon(Icons.input),
                 labelText: 'Port (default: 8080)',
                 errorText: portDirty ? connection.portError : null,
                 helperText: 'Advanced use only'),
@@ -271,16 +275,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         ListTile(
           dense: widget.settings.dense,
-          title: RaisedButton(
-            color: theme.buttonTheme.colorScheme.primary,
-            textColor: Colors.white,
+          title: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              primary: theme.buttonTheme.colorScheme!.primary,
+              onPrimary: Colors.white,
+            ),
             onPressed: !testingConnection ? _testConnection : null,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 testingConnection
-                    ? Padding(
-                        padding: const EdgeInsets.all(4.0),
+                    ? const Padding(
+                        padding: EdgeInsets.all(4.0),
                         child: SizedBox(
                           width: 16,
                           height: 16,
@@ -289,9 +295,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   AlwaysStoppedAnimation<Color>(Colors.white)),
                         ),
                       )
-                    : Icon(Icons.network_check),
+                    : const Icon(Icons.network_check),
                 const SizedBox(width: 8.0),
-                Text('Test & Save Connection'),
+                const Text('Test & Save Connection'),
               ],
             ),
           ),
@@ -305,12 +311,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ? Colors.green
                   : Colors.redAccent,
             ),
-            title: Text(connectionTestResult),
+            title: Text(connectionTestResult!),
             subtitle: connectionTestResultDescription != null
-                ? Text(connectionTestResultDescription)
+                ? Text(connectionTestResultDescription!)
                 : null,
           ),
-        Divider(),
+        const Divider(),
         ListTile(
           dense: widget.settings.dense,
           title: Text(
@@ -319,24 +325,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         CheckboxListTile(
-          title: Text('Compact display'),
+          title: const Text('Compact display'),
           value: widget.settings.dense,
           dense: widget.settings.dense,
           onChanged: (dense) {
             setState(() {
-              widget.settings.dense = dense;
+              widget.settings.dense = dense ?? false;
               widget.onSettingsChanged();
             });
           },
         ),
         CheckboxListTile(
-          title: Text('Blurred cover background'),
-          subtitle: Text('When available for audio files'),
+          title: const Text('Blurred cover background'),
+          subtitle: const Text('When available for audio files'),
           value: widget.settings.blurredCoverBg,
           dense: widget.settings.dense,
           onChanged: (dense) {
             setState(() {
-              widget.settings.blurredCoverBg = dense;
+              widget.settings.blurredCoverBg = dense ?? false;
               widget.onSettingsChanged();
             });
           },

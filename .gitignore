@@ -1,3 +1,6 @@
+.fvm/flutter_sdk
+demo-playlist.xspf
+
 # Miscellaneous
 *.class
 *.log
@@ -6,10 +9,8 @@
 .DS_Store
 .atom/
 .buildlog/
-.gradle/
 .history
 .svn/
-demo-playlist.xspf
 
 # IntelliJ related
 *.iml
@@ -24,6 +25,7 @@ demo-playlist.xspf
 
 # Flutter/Dart/Pub related
 **/doc/api/
+**/ios/Flutter/.last_build_id
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
@@ -41,5 +43,7 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
-# Exceptions to above rules.
-!/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release

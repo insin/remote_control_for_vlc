@@ -12,6 +12,9 @@ var _videoExtensions = RegExp(
 var _audioExtensions = RegExp(
     r'\.(3ga|a52|aac|ac3|adt|adts|aif|aifc|aiff|alac|amr|aob|ape|awb|caf|dts|flac|it|m4a|m4b|m4p|mid|mka|mlp|mod|mpa|mp1|mp2|mp3|mpc|mpga|oga|ogg|oma|opus|ra|ram|rmi|s3m|spx|tta|voc|vqf|w64|wav|wma|wv|xa|xm)$');
 
+var _playlistExtensions = RegExp(
+    r'\.(asx|b4s|cue|ifo|m3u|m3u8|pls|ram|rar|sdp|vlc|xspf|wax|wvx|zip|conf)');
+
 var _audioTranslations = RegExp(
     r"^(Audio|_Audio|Ameslaw|Aodio|Audioa|Audiu|Deng|Dźwięk|Ekirikuhurirwa|Endobozi|Fuaim|Fuaim|Garsas|Hang|Hljóð|Leo|Ljud|Lyd|M_adungan|Ma giwinyo|Odio|Ojoo|Oudio|Ovoz|Sain|Ses|Sonido|Səs|Umsindo|Zvok|Zvuk|Zëri|Àudio|Áudio|Ääni|Ήχος|Аудио|Аўдыё|Дуу|Дыбыс|Звук|Ձայն|שמע|آڈیو, صدا|ئۈن|آڈیو|دەنگ|صدا|غږيز|अडिअ'|अडियो|आडियो|ध्वनी|অডিঅ'|অডিও|ਆਡੀਓ|ઓડિયો|ଅଡ଼ିଓ|ஒலி|శ్రవ్యకం|ಧ್ವನಿ|ഓഡിയോ|ශ්‍රව්‍ය|เสียง|အသံ|აუდიო|ተሰሚ|ድምፅ|អូឌីយ៉ូ|オーディオ|音訊|音频|오디오)$");
 
@@ -50,7 +53,9 @@ class BrowseItem {
 
   BrowseItem.fromUrl(String url)
       : uri = url.startsWith(urlRegExp) ? url : 'https://$url',
-        type = 'web';
+        type = 'web',
+        path = '',
+        name = '';
 
   /// Sending a directory: url when enqueueing makes a directory display as directory in the VLC
   /// playlist instead of as a generic file.
@@ -72,6 +77,9 @@ class BrowseItem {
     if (isVideo) {
       return Icons.movie;
     }
+    if (isPlaylist) {
+      return Icons.list;
+    }
     return Icons.insert_drive_file;
   }
 
@@ -80,6 +88,8 @@ class BrowseItem {
   bool get isDir => type == 'dir';
 
   bool get isFile => type == 'file';
+
+  bool get isPlaylist => _playlistExtensions.hasMatch(path);
 
   bool get isSupportedMedia => isAudio || isVideo || isWeb;
 
@@ -102,6 +112,7 @@ class BrowseItem {
         'uri': uri,
       };
 
+  @override
   String toString() => 'BrowseItem(${toJson()})';
 }
 
@@ -123,19 +134,19 @@ var _ipPattern = RegExp(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$');
 var _numericPattern = RegExp(r'^\d+$');
 
 class Connection {
-  String _ip;
-  String _port;
-  String _password;
+  late String _ip = '';
+  late String _port = defaultPort;
+  late String _password = defaultPassword;
 
-  String _ipError;
-  String _portError;
-  String _passwordError;
+  String? _ipError;
+  String? _portError;
+  String? _passwordError;
 
   Connection();
 
-  get ip => _ip;
-  get port => _port;
-  get password => _password;
+  String get ip => _ip;
+  String get port => _port;
+  String get password => _password;
   get ipError => _ipError;
   get portError => _portError;
   get passwordError => _passwordError;
@@ -144,7 +155,7 @@ class Connection {
 
   /// The connection stored in [Settings] will only have an IP if it's been
   /// successfully tested.
-  bool get hasIp => _ip != null && _ip.isNotEmpty;
+  bool get hasIp => _ip.isNotEmpty;
 
   bool get isValid =>
       _ipError == null && _portError == null && _passwordError == null;
@@ -197,11 +208,11 @@ class Connection {
 }
 
 class Settings {
-  SharedPreferences _prefs;
+  final SharedPreferences _prefs;
 
-  bool blurredCoverBg;
-  bool dense;
-  Connection connection;
+  late bool blurredCoverBg;
+  late bool dense;
+  late Connection connection;
 
   Settings(this._prefs) {
     Map<String, dynamic> json =
@@ -228,16 +239,17 @@ class LanguageTrack {
 
   LanguageTrack(this.name, this.streamNumber);
 
+  @override
   String toString() {
     return '$name ($streamNumber)';
   }
 }
 
 class Equalizer {
-  bool enabled;
-  List<Preset> presets;
-  List<Band> bands;
-  double preamp;
+  late bool enabled;
+  late List<Preset> presets;
+  late List<Band> bands;
+  late double preamp;
 
   @override
   String toString() {
@@ -262,77 +274,91 @@ class Preset {
   Preset(this.id, this.name);
 }
 
+String findFirstElementText(xml.XmlDocument document, String name,
+    [String fallback = '']) {
+  var elements = document.findAllElements(name);
+  if (elements.isNotEmpty) {
+    return elements.first.text;
+  }
+  return fallback;
+}
+
+String findFirstChildElementText(xml.XmlElement element, String name,
+    [String fallback = '']) {
+  var elements = element.findElements(name);
+  if (elements.isNotEmpty) {
+    return elements.first.text;
+  }
+  return fallback;
+}
+
 class VlcStatusResponse {
   xml.XmlDocument document;
-  List<LanguageTrack> _audioTracks;
-  List<LanguageTrack> _subtitleTracks;
-  Map<String, String> _info;
+
+  List<LanguageTrack>? _audioTracks;
+  List<LanguageTrack>? _subtitleTracks;
+  Map<String, String>? _info;
 
   VlcStatusResponse(this.document);
 
-  String get state => document.findAllElements('state').first.text;
+  String get state => findFirstElementText(document, 'state');
 
-  Duration get time => Duration(
-      seconds: int.tryParse(document.findAllElements('time').first.text));
+  Duration get time =>
+      Duration(seconds: int.parse(findFirstElementText(document, 'time', '0')));
 
   Duration get length => Duration(
-      seconds: int.tryParse(document.findAllElements('length').first.text));
+      seconds: int.parse(findFirstElementText(document, 'length', '0')));
 
-  int get volume => int.tryParse(document.findAllElements('volume').first.text);
+  int get volume {
+    return int.parse(findFirstElementText(document, 'volume', '256'));
+  }
 
-  double get rate =>
-      double.tryParse(document.findAllElements('rate').first.text);
+  double get rate => double.parse(document.findAllElements('rate').first.text);
 
   Map<String, String> get _metadata {
-    if (this._info != null) {
-      return _info;
+    if (_info == null) {
+      xml.XmlElement? category;
+      var informations = document.rootElement.findElements('information');
+      if (informations.isNotEmpty) {
+        var categories = informations.first.findElements('category');
+        if (categories.isNotEmpty) {
+          category = categories.first;
+        }
+      }
+      _info = category != null
+          ? {
+              for (var el in category.findElements('info'))
+                el.getAttribute('name') ?? '': el.text
+            }
+          : {};
     }
-    var category = document.rootElement
-        .findElements('information')
-        .first
-        ?.findElements('category')
-        ?.first;
-    _info = category != null
-        ? Map.fromIterable(
-            category.findElements('info'),
-            key: (el) => el.getAttribute('name'),
-            value: (el) => el.text,
-          )
-        : {};
-    return _info;
+    return _info!;
   }
 
   String get title => _metadata['title'] ?? _metadata['filename'] ?? '';
 
   String get artist => _metadata['artist'] ?? '';
 
-  String get artworkUrl => _metadata['artwork_url'];
+  String get artworkUrl => _metadata['artwork_url'] ?? '';
 
-  bool get fullscreen =>
-      document.findAllElements('fullscreen').first.text == 'true';
+  bool get fullscreen => findFirstElementText(document, 'fullscreen') == 'true';
 
-  bool get repeat => document.findAllElements('repeat').first.text == 'true';
+  bool get repeat => findFirstElementText(document, 'repeat') == 'true';
 
-  bool get random => document.findAllElements('random').first.text == 'true';
+  bool get random => findFirstElementText(document, 'random') == 'true';
 
-  bool get loop => document.findAllElements('loop').first.text == 'true';
+  bool get loop => findFirstElementText(document, 'loop') == 'true';
 
-  String get currentPlId => document.findAllElements('currentplid').first.text;
+  String get currentPlId => findFirstElementText(document, 'currentplid', '-1');
 
-  String get version => document.findAllElements('version').first.text;
+  String get version => findFirstElementText(document, 'version');
 
   List<LanguageTrack> get audioTracks {
-    if (_audioTracks == null) {
-      _audioTracks = _getLanguageTracks(_audioTranslations);
-    }
-    return _audioTracks;
+    return _audioTracks ??= _getLanguageTracks(_audioTranslations);
   }
 
   List<LanguageTrack> get subtitleTracks {
-    if (_subtitleTracks == null) {
-      _subtitleTracks = _getLanguageTracks(_subtitleTranslations);
-    }
-    return _subtitleTracks;
+    return _subtitleTracks ??= _getLanguageTracks(_subtitleTranslations);
   }
 
   Equalizer get equalizer {
@@ -345,7 +371,7 @@ class VlcStatusResponse {
     equalizer.presets = el
         .findAllElements('preset')
         .map((el) => Preset(
-              int.parse(el.getAttribute('id')),
+              int.parse(el.getAttribute('id')!),
               el.text,
             ))
         .toList();
@@ -353,7 +379,7 @@ class VlcStatusResponse {
     equalizer.bands = el
         .findAllElements('band')
         .map((el) => Band(
-              int.parse(el.getAttribute('id')),
+              int.parse(el.getAttribute('id')!),
               double.parse(el.text),
             ))
         .toList();
@@ -365,17 +391,19 @@ class VlcStatusResponse {
   List<LanguageTrack> _getLanguageTracks(RegExp type) {
     List<LanguageTrack> tracks = [];
     document.findAllElements('category').forEach((category) {
-      Map<String, String> info = Map.fromIterable(category.findElements('info'),
-          key: (info) => info.getAttribute('name'), value: (info) => info.text);
-      var typeKey = info.keys.firstWhere(
-          (key) => _typeTranslations.hasMatch(key.trim()),
-          orElse: () => null);
-      if (typeKey == null || !type.hasMatch(info[typeKey].trim())) {
+      Map<String, String> info = {
+        for (var info in category.findElements('info'))
+          info.getAttribute('name')!: info.text
+      };
+
+      String? typeKey = firstWhereOrNull(
+          info.keys, (key) => _typeTranslations.hasMatch(key.trim()));
+      if (typeKey == null || !type.hasMatch(info[typeKey]!.trim())) {
         return;
       }
 
       var streamName = category.getAttribute('name');
-      var streamNumber = int.tryParse(streamName.split(' ').last);
+      var streamNumber = int.tryParse(streamName!.split(' ').last);
       if (streamNumber == null) {
         return;
       }
@@ -405,12 +433,13 @@ class VlcStatusResponse {
     return tracks;
   }
 
-  String _getStreamInfoItem(Map<String, String> info, RegExp name) {
-    var key = info.keys
-        .firstWhere((key) => name.hasMatch(key.trim()), orElse: () => null);
-    return (key != null && info[key].isNotEmpty) ? info[key] : null;
+  String? _getStreamInfoItem(Map<String, String> info, RegExp name) {
+    String? key =
+        firstWhereOrNull(info.keys, (key) => name.hasMatch(key.trim()));
+    return (key != null && info[key]!.isNotEmpty) ? info[key] : null;
   }
 
+  @override
   String toString() {
     return 'VlcStatusResponse(${{
       'state': state,
@@ -438,10 +467,10 @@ class PlaylistItem {
   bool current;
 
   PlaylistItem.fromXmlElement(xml.XmlElement el)
-      : name = el.getAttribute('name'),
-        id = el.getAttribute('id'),
-        duration = Duration(seconds: int.tryParse(el.getAttribute('duration'))),
-        uri = el.getAttribute('uri'),
+      : name = el.getAttribute('name')!,
+        id = el.getAttribute('id')!,
+        duration = Duration(seconds: int.parse(el.getAttribute('duration')!)),
+        uri = el.getAttribute('uri')!,
         current = el.getAttribute('current') != null;
 
   IconData get icon {
@@ -474,6 +503,7 @@ class PlaylistItem {
 
   String get title => isVideo ? cleanVideoTitle(name, keepExt: false) : name;
 
+  @override
   String toString() {
     return 'PlaylistItem(${{
       'name': name,
@@ -488,7 +518,7 @@ class PlaylistItem {
 
 class VlcPlaylistResponse {
   List<PlaylistItem> items;
-  PlaylistItem currentItem;
+  PlaylistItem? currentItem;
 
   VlcPlaylistResponse.fromXmlDocument(xml.XmlDocument doc)
       : items = doc.rootElement
@@ -497,10 +527,10 @@ class VlcPlaylistResponse {
             .findAllElements('leaf')
             .map((el) => PlaylistItem.fromXmlElement(el))
             .toList() {
-    currentItem =
-        items.firstWhere((item) => item.current ?? false, orElse: () => null);
+    currentItem = firstWhereOrNull(items, (item) => item.current);
   }
 
+  @override
   String toString() {
     return 'VlcPlaylistResponse(${{
       'items': items,

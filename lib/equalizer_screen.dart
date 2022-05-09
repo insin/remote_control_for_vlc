@@ -30,20 +30,21 @@ var _frequencies = [
 
 class EqualizerScreen extends StatefulWidget {
   final Equalizer equalizer;
-  final Stream<Equalizer> equalizerStream;
-  final Future<Equalizer> Function(bool enabled) onToggleEnabled;
-  final Future<Equalizer> Function(int presetId) onPresetChange;
-  final Future<Equalizer> Function(String db) onPreampChange;
-  final Future<Equalizer> Function(int bandId, String db) onBandChange;
+  final Stream<Equalizer?> equalizerStream;
+  final Future<Equalizer?> Function(bool enabled) onToggleEnabled;
+  final Future<Equalizer?> Function(int presetId) onPresetChange;
+  final Future<Equalizer?> Function(String db) onPreampChange;
+  final Future<Equalizer?> Function(int bandId, String db) onBandChange;
 
-  EqualizerScreen({
-    this.equalizer,
-    this.equalizerStream,
-    this.onToggleEnabled,
-    this.onPresetChange,
-    this.onPreampChange,
-    this.onBandChange,
-  });
+  const EqualizerScreen({
+    Key? key,
+    required this.equalizer,
+    required this.equalizerStream,
+    required this.onToggleEnabled,
+    required this.onPresetChange,
+    required this.onPreampChange,
+    required this.onBandChange,
+  }) : super(key: key);
 
   @override
   _EqualizerScreenState createState() => _EqualizerScreenState();
@@ -51,20 +52,21 @@ class EqualizerScreen extends StatefulWidget {
 
 class _EqualizerScreenState extends State<EqualizerScreen> {
   /// The most recent equalizer status from VLC.
-  Equalizer _equalizer;
+  late Equalizer _equalizer = widget.equalizer;
 
   /// Used to listen for equalizer status updates from VLC.
-  StreamSubscription _equalizerSubscription;
+  late final StreamSubscription _equalizerSubscription =
+      widget.equalizerStream.listen(_onEqualizer);
 
   /// TODO Extract preset settings from VLC and use their preamp and band values to match a preset name
   /// The last-selected preset - selected preset info isn't available from VLC.
-  Preset _preset;
+  Preset? _preset;
 
   /// The value for the Preamp slider during and after finishing dragging it.
   ///
   /// This will be removed once the preamp value from a VLC status update
   /// matches it.
-  double _preamp;
+  double? _preamp;
 
   /// Used to ignore equalizer status updates VLC after a band change finishes
   /// while sending requests to update equalizer bands.
@@ -76,7 +78,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
   bool _snapBands = true;
 
   /// The id/index of the band slider currently being dragged.
-  int _draggingBand;
+  int? _draggingBand;
 
   /// The initial equalizer state when a band slider started dragging.- used to
   /// calculate values for other bands when [_snapBands] is `true.
@@ -85,22 +87,15 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
   /// finishes, values for modified bands are stored in this object, which is
   /// used for display until equalizer band values from VLC status updates match
   /// its values.
-  Equalizer _draggingEqualizer;
+  Equalizer? _draggingEqualizer;
 
   /// The value [_draggingBand] had when its drag started
   ///
   /// Used with [_dragValue] to calculate the delta when snapping bands.
-  double _dragStartValue;
+  double? _dragStartValue;
 
   /// The current value of the band being dragged.
-  double _dragValue;
-
-  @override
-  void initState() {
-    _equalizer = widget.equalizer;
-    _equalizerSubscription = widget.equalizerStream.listen(_onEqualizer);
-    super.initState();
-  }
+  double? _dragValue;
 
   @override
   void dispose() {
@@ -108,7 +103,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
     super.dispose();
   }
 
-  _onEqualizer(Equalizer equalizer) {
+  _onEqualizer(Equalizer? equalizer) {
     if (equalizer == null) {
       Navigator.pop(context);
       return;
@@ -116,12 +111,12 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
     if (_ignoreStatusUpdates) {
       return;
     }
-    this.setState(() {
+    setState(() {
       // Get rid of the equalizer containing values from a finished EQ change
       // once the equalizer from VLC status updates matches it.
       if (_draggingBand == null &&
           _draggingEqualizer != null &&
-          _draggingEqualizer.bands.every((band) =>
+          _draggingEqualizer!.bands.every((band) =>
               _decibelsToString(band.value) ==
               _decibelsToString(equalizer.bands[band.id].value))) {
         _draggingEqualizer = null;
@@ -131,7 +126,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
   }
 
   _toggleEnabled(enabled) async {
-    var equalizer = await widget.onToggleEnabled(enabled);
+    Equalizer? equalizer = await widget.onToggleEnabled(enabled);
     if (equalizer == null) {
       Navigator.pop(context);
       return;
@@ -145,7 +140,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
     var preset = await showDialog(
       context: context,
       builder: (context) => SimpleDialog(
-        title: Text('Preset'),
+        title: const Text('Preset'),
         children: _equalizer.presets
             .map((preset) => SimpleDialogOption(
                   child: Text(preset.name),
@@ -192,26 +187,26 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
     }
     // The dragging band always uses the drag value
     if (band == _draggingBand) {
-      return _dragValue;
+      return _dragValue!;
     }
     // If we're not snapping, other bands use the current value
     if (!_snapBands) {
       return _equalizer.bands[band].value;
     }
     // Otherwise add portions of the size of the change to neighbouring bands
-    var distance = (band - _draggingBand).abs();
+    var distance = (band - _draggingBand!).abs();
     switch (distance) {
       case 1:
-        return (_draggingEqualizer.bands[band].value +
-                ((_dragValue - _dragStartValue) / 2))
+        return (_draggingEqualizer!.bands[band].value +
+                ((_dragValue! - _dragStartValue!) / 2))
             .clamp(-20.0, 20.0);
       case 2:
-        return (_draggingEqualizer.bands[band].value +
-                ((_dragValue - _dragStartValue) / 8))
+        return (_draggingEqualizer!.bands[band].value +
+                ((_dragValue! - _dragStartValue!) / 8))
             .clamp(-20.0, 20.0);
       case 3:
-        return (_draggingEqualizer.bands[band].value +
-                ((_dragValue - _dragStartValue) / 40))
+        return (_draggingEqualizer!.bands[band].value +
+                ((_dragValue! - _dragStartValue!) / 40))
             .clamp(-20.0, 20.0);
       default:
         return _equalizer.bands[band].value;
@@ -236,15 +231,15 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
   _onBandChangeEnd(double value) async {
     List<Band> bandChanges = [];
     if (!_snapBands) {
-      _draggingEqualizer.bands[_draggingBand].value = value;
-      bandChanges.add(Band(_draggingBand, value));
+      _draggingEqualizer!.bands[_draggingBand!].value = value;
+      bandChanges.add(Band(_draggingBand!, value));
     } else {
-      for (int band = math.max(0, _draggingBand - 3);
-          band < math.min(_frequencies.length, _draggingBand + 4);
+      for (int band = math.max(0, _draggingBand! - 3);
+          band < math.min(_frequencies.length, _draggingBand! + 4);
           band++) {
         var value = _getBandValue(band);
         // Store new values to display while VLC status catches up
-        _draggingEqualizer.bands[band].value = value;
+        _draggingEqualizer!.bands[band].value = value;
         bandChanges.add(Band(band, value));
       }
     }
@@ -268,23 +263,23 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
       ),
       body: ListView(children: [
         SwitchListTile(
-          title: Text('Enable', textAlign: TextAlign.right),
+          title: const Text('Enable', textAlign: TextAlign.right),
           value: _equalizer.enabled,
           onChanged: _toggleEnabled,
         ),
         if (_equalizer.enabled)
           Column(children: [
             ListTile(
-              title: Text('Preset'),
+              title: const Text('Preset'),
               subtitle: Text(_preset?.name ?? 'Tap to select'),
               onTap: _choosePreset,
             ),
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: <Widget>[
                   Text('Preamp', style: theme.textTheme.subtitle1),
-                  SizedBox(width: 16),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: SliderTheme(
                       data: SliderTheme.of(context).copyWith(
@@ -308,7 +303,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
                 ],
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
               for (int i = 0; i < _frequencies.length; i++)
                 _VerticalBandSlider(
@@ -321,7 +316,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
                 ),
             ]),
             SwitchListTile(
-              title: Text('Snap bands', textAlign: TextAlign.right),
+              title: const Text('Snap bands', textAlign: TextAlign.right),
               value: _snapBands,
               onChanged: (snapBands) {
                 setState(() {
@@ -343,13 +338,13 @@ class _VerticalBandSlider extends StatefulWidget {
   final Function(double value) onChanged;
   final Function(double value) onChangeEnd;
 
-  _VerticalBandSlider({
-    this.label,
-    this.band,
-    this.value,
-    this.onChangeStart,
-    this.onChanged,
-    this.onChangeEnd,
+  const _VerticalBandSlider({
+    required this.label,
+    required this.band,
+    required this.value,
+    required this.onChangeStart,
+    required this.onChanged,
+    required this.onChangeEnd,
   });
 
   @override
@@ -360,15 +355,15 @@ class _VerticalBandSliderState extends State<_VerticalBandSlider> {
   @override
   Widget build(BuildContext context) {
     return Column(children: [
-      Text('+20dB', style: TextStyle(fontSize: 10)),
-      SizedBox(height: 16),
+      const Text('+20dB', style: TextStyle(fontSize: 10)),
+      const SizedBox(height: 16),
       RotatedBox(
         quarterTurns: -1,
         child: SliderTheme(
           data: SliderTheme.of(context).copyWith(
             trackShape: FullWidthTrackShape(),
-            thumbShape: RoundSliderThumbShape(enabledThumbRadius: 8),
-            overlayShape: RoundSliderOverlayShape(overlayRadius: 16),
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+            overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
           ),
           child: Slider(
             max: 20,
@@ -386,11 +381,11 @@ class _VerticalBandSliderState extends State<_VerticalBandSlider> {
           ),
         ),
       ),
-      SizedBox(height: 16),
-      Text('-20dB', style: TextStyle(fontSize: 10)),
-      SizedBox(height: 8),
+      const SizedBox(height: 16),
+      const Text('-20dB', style: TextStyle(fontSize: 10)),
+      const SizedBox(height: 8),
       Text(widget.label,
-          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
     ]);
   }
 }

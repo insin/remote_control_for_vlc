@@ -122,21 +122,32 @@ String cleanVideoTitle(String name, {bool keepExt = false}) {
     return '';
   }
   if (_episode.hasMatch(name)) {
-    return dotsToSpaces(name.substring(0, _episode.firstMatch(name).end));
+    return dotsToSpaces(name.substring(0, _episode.firstMatch(name)!.end));
   }
   if (_movie.hasMatch(name)) {
-    return dotsToSpaces(name.substring(0, _movie.firstMatch(name).start));
+    return dotsToSpaces(name.substring(0, _movie.firstMatch(name)!.start));
   }
   return dotsToSpaces(name, keepExt: keepExt);
 }
 
 String dotsToSpaces(String s, {bool keepExt = false}) {
-  String ext;
+  String ext = '';
   var parts = s.split(_dot);
   if (keepExt) {
     ext = parts.removeLast();
   }
-  return parts.join(' ') + (keepExt ? '.$ext' : '');
+  return parts.join(' ') + '.$ext';
+}
+
+/// [Iterable.firstWhere] doesn't work with null safety when you want to fall
+/// back to returning `null`.
+///
+/// See https://github.com/dart-lang/sdk/issues/42947
+T? firstWhereOrNull<T>(Iterable<T> iterable, bool Function(T element) test) {
+  for (var element in iterable) {
+    if (test(element)) return element;
+  }
+  return null;
 }
 
 String formatTime(Duration duration) {

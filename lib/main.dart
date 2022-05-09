@@ -16,7 +16,7 @@ var showingErrorDialog = false;
 
 void main() async {
   FlutterError.onError = (FlutterErrorDetails details) async {
-    Zone.current.handleUncaughtError(details.exception, details.stack);
+    Zone.current.handleUncaughtError(details.exception, details.stack!);
   };
 
   runZonedGuarded<Future<void>>(() async {
@@ -25,14 +25,14 @@ void main() async {
     runApp(VlcRemote(prefs: prefs, settings: Settings(prefs)));
   }, (error, stackTrace) async {
     if (showingErrorDialog ||
-        navigatorKey?.currentState?.overlay?.context == null) {
+        navigatorKey.currentState?.overlay?.context == null) {
       return;
     }
     showingErrorDialog = true;
     await showDialog(
-      context: navigatorKey.currentState.overlay.context,
+      context: navigatorKey.currentState!.overlay!.context,
       builder: (context) => AlertDialog(
-        title: Text('Unhandled Error'),
+        title: const Text('Unhandled Error'),
         content: SingleChildScrollView(
           child: Column(
             children: <Widget>[
@@ -41,8 +41,8 @@ void main() async {
           ),
         ),
         actions: <Widget>[
-          FlatButton(
-            child: Text('COPY ERROR DETAILS'),
+          TextButton(
+            child: const Text('COPY ERROR DETAILS'),
             onPressed: () {
               Clipboard.setData(
                 ClipboardData(text: '$error\n\n$stackTrace'),
@@ -60,10 +60,11 @@ class VlcRemote extends StatelessWidget {
   final SharedPreferences prefs;
   final Settings settings;
 
-  VlcRemote({
-    @required this.prefs,
-    @required this.settings,
-  });
+  const VlcRemote({
+    Key? key,
+    required this.prefs,
+    required this.settings,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {

@@ -3,13 +3,15 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui';
 
-import 'package:connectivity/connectivity.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:http/http.dart' as http;
 import 'package:just_throttle_it/just_throttle_it.dart';
-import 'package:ping_discover_network/ping_discover_network.dart';
+import 'package:network_info_plus/network_info_plus.dart';
+import 'package:network_tools/network_tools.dart';
+// import 'package:ping_discover_network/ping_discover_network.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:transparent_image/transparent_image.dart';
 import 'package:xml/xml.dart' as xml;
@@ -22,28 +24,29 @@ import 'utils.dart';
 import 'vlc_configuration_guide.dart';
 import 'widgets.dart';
 
-var _headerFooterBgColor = Color.fromRGBO(241, 241, 241, 1.0);
+var _headerFooterBgColor = const Color.fromRGBO(241, 241, 241, 1.0);
 const _tickIntervalSeconds = 1;
 const _sliderThrottleMilliseconds = 333;
 
 enum _PopupMenuChoice {
-  AUDIO_TRACK,
-  EMPTY_PLAYLIST,
-  FULLSCREEN,
-  PLAYBACK_SPEED,
-  SETTINGS,
-  SNAPSHOT,
-  SUBTITLE_TRACK
+  audioTrack,
+  emptyPlaylist,
+  fullscreen,
+  playbackSpeed,
+  settings,
+  snapshot,
+  subtitleTrack
 }
 
 class RemoteControl extends StatefulWidget {
   final SharedPreferences prefs;
   final Settings settings;
 
-  RemoteControl({
-    @required this.prefs,
-    @required this.settings,
-  });
+  const RemoteControl({
+    Key? key,
+    required this.prefs,
+    required this.settings,
+  }) : super(key: key);
 
   @override
   State<StatefulWidget> createState() => _RemoteControlState();
@@ -52,30 +55,31 @@ class RemoteControl extends StatefulWidget {
 class _RemoteControlState extends State<RemoteControl> {
   //#region Setup state
   bool _autoConnecting = false;
-  String _autoConnectError;
-  String _autoConnectHost;
+  String? _autoConnectError;
+  String? _autoConnectHost;
   //#endregion
 
   //#region HTTP requests / timer state
-  http.Client _client = http.Client();
-  int _lastStatusResponseCode;
-  int _lastPlaylistResponseCode;
-  String _lastPlaylistResponseBody;
+  final http.Client _client = http.Client();
+  int? _lastStatusResponseCode;
+  int? _lastPlaylistResponseCode;
+  String? _lastPlaylistResponseBody;
 
   /// Timer which controls polling status and playlist info from VLC.
-  Timer _pollingTicker;
+  late Timer _pollingTicker =
+      Timer.periodic(const Duration(seconds: _tickIntervalSeconds), _tick);
 
   /// Timer used for single updates when polling is disabled.
-  Timer _singleUpdateTimer;
+  Timer? _singleUpdateTimer;
   //#endregion
 
   //#region VLC status state
   /// Contains subtitle and audio track information for use in the menu.
-  VlcStatusResponse _lastStatusResponse;
+  VlcStatusResponse? _lastStatusResponse;
 
   /// Used to send equalizer changes to EqualizerScreen when it's open.
-  StreamController<Equalizer> _equalizerController =
-      StreamController<Equalizer>.broadcast();
+  final StreamController<Equalizer?> _equalizerController =
+      StreamController<Equalizer?>.broadcast();
 
   // Fields populated from the latest VLC status response
   String _state = 'stopped';
@@ -88,20 +92,20 @@ class _RemoteControlState extends State<RemoteControl> {
   bool _repeat = false;
   bool _loop = false;
   bool _random = false;
-  Equalizer _equalizer;
+  Equalizer? _equalizer;
 
   /// Used to ignore status in any in-flight requests after we've told VLC to
   /// toggle playback settings.
-  DateTime _ignoreLoopStatusBefore;
-  DateTime _ignoreRandomStatusBefore;
-  DateTime _ignoreRateStatusBefore;
+  DateTime? _ignoreLoopStatusBefore;
+  DateTime? _ignoreRandomStatusBefore;
+  DateTime? _ignoreRateStatusBefore;
   //#endregion
 
   //#region Playlist state
-  ScrollController _scrollController = ScrollController();
+  final ScrollController _scrollController = ScrollController();
   List<PlaylistItem> _playlist = [];
-  PlaylistItem _playing;
-  String _backgroundArtUrl;
+  PlaylistItem? _playing;
+  String? _backgroundArtUrl;
   bool _reusingBackgroundArt = false;
   bool _showAddMediaButton = true;
   //#endregion
@@ -119,13 +123,13 @@ class _RemoteControlState extends State<RemoteControl> {
 
   /// Used to ignore volume status in any in-flight requests after we've told
   /// VLC to change the volume.
-  DateTime _ignoreVolumeStatusBefore;
+  DateTime? _ignoreVolumeStatusBefore;
 
   /// Previous volume when the volume button was long-pressed to mute.
-  int _preMuteVolume;
+  int? _preMuteVolume;
 
   /// Timer used for automatically hiding the volume controls after a delay.
-  Timer _hideVolumeControlsTimer;
+  Timer? _hideVolumeControlsTimer;
   //#endregion
 
   //#region Time state
@@ -143,8 +147,6 @@ class _RemoteControlState extends State<RemoteControl> {
 
   @override
   initState() {
-    _pollingTicker =
-        Timer.periodic(Duration(seconds: _tickIntervalSeconds), _tick);
     super.initState();
     _scrollController.addListener(_handleScroll);
     _checkWifi();
@@ -174,7 +176,7 @@ class _RemoteControlState extends State<RemoteControl> {
     });
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => const AlertDialog(
         title: Text('Turn on Wi-Fi'),
         content: Text(
           'A Wi-Fi connection was not detected.\n\nRemote Control for VLC needs to connect to your local network to control VLC.',
@@ -199,8 +201,8 @@ class _RemoteControlState extends State<RemoteControl> {
   ///
   /// For the playlist endpoint, the response will be ignored if it's exactly
   /// the same as the last playlist response we received.
-  Future<xml.XmlDocument> _serverRequest(String endpoint,
-      [Map<String, String> queryParameters]) async {
+  Future<xml.XmlDocument?> _serverRequest(String endpoint,
+      [Map<String, String>? queryParameters]) async {
     http.Response response;
     try {
       response = await _client
@@ -212,7 +214,7 @@ class _RemoteControlState extends State<RemoteControl> {
             ),
             headers: _authHeaders,
           )
-          .timeout(Duration(seconds: 1));
+          .timeout(const Duration(seconds: 1));
     } catch (e) {
       assert(() {
         if (e is! TimeoutException) {
@@ -257,12 +259,12 @@ class _RemoteControlState extends State<RemoteControl> {
       }
       _lastPlaylistResponseBody = responseBody;
     }
-    return xml.parse(responseBody);
+    return xml.XmlDocument.parse(responseBody);
   }
 
-  Future<Equalizer> _equalizerRequest(
+  Future<Equalizer?> _equalizerRequest(
       Map<String, String> queryParameters) async {
-    xml.XmlDocument document = await _serverRequest('status', queryParameters);
+    xml.XmlDocument? document = await _serverRequest('status', queryParameters);
     if (document == null) {
       return null;
     }
@@ -276,9 +278,9 @@ class _RemoteControlState extends State<RemoteControl> {
 
   /// Send a request to VLC's status API endpoint - this is used to submit
   /// commands as well as getting the current state of VLC.
-  _statusRequest([Map<String, String> queryParameters]) async {
+  _statusRequest([Map<String, String>? queryParameters]) async {
     var requestTime = DateTime.now();
-    xml.XmlDocument document = await _serverRequest('status', queryParameters);
+    xml.XmlDocument? document = await _serverRequest('status', queryParameters);
     if (document == null) {
       _equalizerController.add(null);
       return;
@@ -302,11 +304,11 @@ class _RemoteControlState extends State<RemoteControl> {
     var ignoreVolumeUpdates = _draggingVolume ||
         queryParameters != null && queryParameters['command'] == 'volume' ||
         _ignoreVolumeStatusBefore != null &&
-            requestTime.isBefore(_ignoreVolumeStatusBefore);
+            requestTime.isBefore(_ignoreVolumeStatusBefore!);
 
     var ignoreRateUpdate = _draggingRate ||
         _ignoreRateStatusBefore != null &&
-            requestTime.isBefore(_ignoreRateStatusBefore);
+            requestTime.isBefore(_ignoreRateStatusBefore!);
 
     setState(() {
       if (!ignoreStateUpdates) {
@@ -315,7 +317,7 @@ class _RemoteControlState extends State<RemoteControl> {
       _length = statusResponse.length.isNegative
           ? Duration.zero
           : statusResponse.length;
-      if (!ignoreVolumeUpdates && statusResponse.volume != null) {
+      if (!ignoreVolumeUpdates) {
         _volume = statusResponse.volume.clamp(0, 512);
       }
       if (!ignoreRateUpdate) {
@@ -346,19 +348,21 @@ class _RemoteControlState extends State<RemoteControl> {
         // Keep using the existing URL if the new item has artwork and both
         // items are using the same artwork file.
         _reusingBackgroundArt = _backgroundArtUrl != null &&
-            statusResponse.artworkUrl != null &&
+            statusResponse.artworkUrl.isNotEmpty &&
             statusResponse.artworkUrl == _lastStatusResponse?.artworkUrl;
-        if (!_reusingBackgroundArt) {
+        if (statusResponse.artworkUrl.isNotEmpty && !_reusingBackgroundArt) {
           _backgroundArtUrl = _artUrlForPlid(statusResponse.currentPlId);
+        } else if (statusResponse.artworkUrl.isEmpty) {
+          _backgroundArtUrl = null;
         }
       }
       if (_ignoreLoopStatusBefore == null ||
-          requestTime.isAfter(_ignoreLoopStatusBefore)) {
+          requestTime.isAfter(_ignoreLoopStatusBefore!)) {
         _loop = statusResponse.loop;
         _repeat = statusResponse.repeat;
       }
       if (_ignoreRandomStatusBefore == null ||
-          requestTime.isAfter(_ignoreRandomStatusBefore)) {
+          requestTime.isAfter(_ignoreRandomStatusBefore!)) {
         _random = statusResponse.random;
       }
       _equalizer = statusResponse.equalizer;
@@ -370,7 +374,7 @@ class _RemoteControlState extends State<RemoteControl> {
   /// Sends a request to VLC's playlist API endpoint to get the current playlist
   /// (which also indicates the currently playing item).
   _playlistRequest() async {
-    xml.XmlDocument document = await _serverRequest('playlist', null);
+    xml.XmlDocument? document = await _serverRequest('playlist', null);
 
     if (document == null) {
       return;
@@ -385,7 +389,7 @@ class _RemoteControlState extends State<RemoteControl> {
         _reusingBackgroundArt = false;
       }
       if (playlistResponse.items.length < _playlist.length) {
-        SchedulerBinding.instance.addPostFrameCallback((timeStamp) {
+        SchedulerBinding.instance?.addPostFrameCallback((timeStamp) {
           _showAddMediaButtonIfNotScrollable();
         });
       }
@@ -425,10 +429,10 @@ class _RemoteControlState extends State<RemoteControl> {
       message = 'Paused polling for status updates';
     } else {
       _pollingTicker =
-          Timer.periodic(Duration(seconds: _tickIntervalSeconds), _tick);
+          Timer.periodic(const Duration(seconds: _tickIntervalSeconds), _tick);
       message = 'Resumed polling for status updates';
     }
-    Scaffold.of(context).showSnackBar(SnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(message),
     ));
     setState(() {});
@@ -436,17 +440,17 @@ class _RemoteControlState extends State<RemoteControl> {
 
   _scheduleSingleUpdate() async {
     // Ticker will do the UI updates, no need to schedule any further update
-    if (_pollingTicker != null && _pollingTicker.isActive) {
+    if (_pollingTicker.isActive) {
       return;
     }
 
     // Cancel any existing delay timer so the latest state is updated in one shot
-    if (_singleUpdateTimer != null && _singleUpdateTimer.isActive) {
-      _singleUpdateTimer.cancel();
+    if (_singleUpdateTimer != null && _singleUpdateTimer!.isActive) {
+      _singleUpdateTimer!.cancel();
     }
 
-    _singleUpdateTimer = Timer(
-        Duration(seconds: _tickIntervalSeconds), _updateStatusAndPlaylist);
+    _singleUpdateTimer = Timer(const Duration(seconds: _tickIntervalSeconds),
+        _updateStatusAndPlaylist);
   }
   //#endregion
 
@@ -455,7 +459,7 @@ class _RemoteControlState extends State<RemoteControl> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => VlcConfigurationGuide(),
+        builder: (context) => const VlcConfigurationGuide(),
       ),
     );
   }
@@ -474,30 +478,27 @@ class _RemoteControlState extends State<RemoteControl> {
       });
       return;
     }
-    var ip = await Connectivity().getWifiIP();
-    var subnet = ip.substring(0, ip.lastIndexOf('.'));
 
-    final stream = NetworkAnalyzer.discover2(
-      subnet,
-      int.parse(defaultPort),
-      timeout: Duration(seconds: 1),
-    );
-
-    List<String> ips = [];
-    var subscription = stream.listen((NetworkAddress address) {
-      if (address.exists) {
-        ips.add(address.ip);
-      }
-    });
-    subscription.onError((error) {
-      subscription.cancel();
+    var ip = await NetworkInfo().getWifiIP();
+    if (ip == null) {
       setState(() {
         _autoConnecting = false;
-        _autoConnectError = 'Error scanning network: $error';
+        _autoConnectError = 'Unable to get Wi-Fi IP address';
       });
-    });
-    subscription.onDone(() {
-      if (ips.length == 0) {
+      return;
+    }
+
+    var subnet = ip.substring(0, ip.lastIndexOf('.'));
+    final stream = HostScanner.discoverPort(subnet, int.parse(defaultPort),
+        timeout: const Duration(seconds: 1));
+
+    List<String> ips = [];
+    stream.listen((OpenPort port) {
+      if (port.isOpen) {
+        ips.add(port.ip);
+      }
+    }, onDone: () {
+      if (ips.isEmpty) {
         setState(() {
           _autoConnecting = false;
           _autoConnectError =
@@ -506,14 +507,19 @@ class _RemoteControlState extends State<RemoteControl> {
         return;
       }
       setState(() {
-        if (ips.length > 0) {
+        if (ips.isNotEmpty) {
           _autoConnectHost =
-              'Found multiple host, using the first one: ${ips.join(', ')}';
+              'Found multiple hosts, using the first one: ${ips.join(', ')}';
         }
         _autoConnectHost = 'Found host: ${ips.first}';
       });
       _testConnection(ips.first);
-    });
+    }, onError: (error) {
+      setState(() {
+        _autoConnecting = false;
+        _autoConnectError = 'Error scanning network: $error';
+      });
+    }, cancelOnError: true);
   }
 
   _testConnection(String ip) async {
@@ -527,7 +533,7 @@ class _RemoteControlState extends State<RemoteControl> {
           headers: {
             'Authorization':
                 'Basic ' + base64Encode(utf8.encode(':$defaultPassword'))
-          }).timeout(Duration(seconds: 1));
+          }).timeout(const Duration(seconds: 1));
     } catch (e) {
       setState(() {
         _autoConnecting = false;
@@ -594,17 +600,17 @@ class _RemoteControlState extends State<RemoteControl> {
     showDialog(
       context: context,
       builder: (BuildContext context) => AlertDialog(
-        title: Text('Remove item from playlist?'),
+        title: const Text('Remove item from playlist?'),
         content: Text(item.title),
         actions: <Widget>[
-          FlatButton(
-            child: Text("CANCEL"),
+          TextButton(
+            child: const Text("CANCEL"),
             onPressed: () {
               Navigator.pop(context);
             },
           ),
-          FlatButton(
-            child: Text("REMOVE"),
+          TextButton(
+            child: const Text("REMOVE"),
             onPressed: () {
               _statusRequest({
                 'command': 'pl_delete',
@@ -623,31 +629,31 @@ class _RemoteControlState extends State<RemoteControl> {
   //#region Popup menu
   _onPopupMenuChoice(_PopupMenuChoice choice) {
     switch (choice) {
-      case _PopupMenuChoice.AUDIO_TRACK:
+      case _PopupMenuChoice.audioTrack:
         _chooseAudioTrack();
         break;
-      case _PopupMenuChoice.EMPTY_PLAYLIST:
+      case _PopupMenuChoice.emptyPlaylist:
         _emptyPlaylist();
         break;
-      case _PopupMenuChoice.FULLSCREEN:
+      case _PopupMenuChoice.fullscreen:
         _toggleFullScreen();
         break;
-      case _PopupMenuChoice.PLAYBACK_SPEED:
+      case _PopupMenuChoice.playbackSpeed:
         _showPlaybackSpeedControl();
         break;
-      case _PopupMenuChoice.SETTINGS:
+      case _PopupMenuChoice.settings:
         _showSettings();
         break;
-      case _PopupMenuChoice.SNAPSHOT:
+      case _PopupMenuChoice.snapshot:
         _takeSnapshot();
         break;
-      case _PopupMenuChoice.SUBTITLE_TRACK:
+      case _PopupMenuChoice.subtitleTrack:
         _chooseSubtitleTrack();
         break;
     }
   }
 
-  Future<LanguageTrack> _chooseLanguageTrack(List<LanguageTrack> options,
+  Future<LanguageTrack?> _chooseLanguageTrack(List<LanguageTrack> options,
       {bool allowNone = false}) {
     var dialogOptions = options
         .map((option) => SimpleDialogOption(
@@ -664,7 +670,7 @@ class _RemoteControlState extends State<RemoteControl> {
             onPressed: () {
               Navigator.pop(context, LanguageTrack('(None)', -1));
             },
-            child: Text('(None)'),
+            child: const Text('(None)'),
           ));
     }
     return showDialog<LanguageTrack>(
@@ -678,8 +684,11 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _chooseSubtitleTrack() async {
-    LanguageTrack subtitleTrack = await _chooseLanguageTrack(
-        _lastStatusResponse.subtitleTracks,
+    if (_lastStatusResponse == null) {
+      return;
+    }
+    LanguageTrack? subtitleTrack = await _chooseLanguageTrack(
+        _lastStatusResponse!.subtitleTracks,
         allowNone: true);
     if (subtitleTrack != null) {
       _statusRequest({
@@ -690,8 +699,11 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _chooseAudioTrack() async {
-    LanguageTrack audioTrack =
-        await _chooseLanguageTrack(_lastStatusResponse.audioTracks);
+    if (_lastStatusResponse == null) {
+      return;
+    }
+    LanguageTrack? audioTrack =
+        await _chooseLanguageTrack(_lastStatusResponse!.audioTracks);
     if (audioTrack != null) {
       _statusRequest({
         'command': 'audio_track',
@@ -709,11 +721,14 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _showEqualizer() {
+    if (_equalizer == null) {
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => EqualizerScreen(
-          equalizer: _equalizer,
+          equalizer: _equalizer!,
           equalizerStream: _equalizerController.stream,
           onToggleEnabled: (enabled) {
             return _equalizerRequest(
@@ -724,7 +739,7 @@ class _RemoteControlState extends State<RemoteControl> {
                 {'command': 'setpreset', 'val': '$presetId'});
           },
           onPreampChange: (value) {
-            return _equalizerRequest({'command': 'preamp', 'val': '$value'});
+            return _equalizerRequest({'command': 'preamp', 'val': value});
           },
           onBandChange: (bandId, value) {
             return _equalizerRequest(
@@ -797,7 +812,7 @@ class _RemoteControlState extends State<RemoteControl> {
   _showPlaybackSpeedControl() {
     var theme = Theme.of(context);
     showModalBottomSheet(
-      shape: RoundedRectangleBorder(
+      shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(16),
           topRight: Radius.circular(16),
@@ -832,7 +847,7 @@ class _RemoteControlState extends State<RemoteControl> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: <Widget>[
-                                Text('0.25'),
+                                const Text('0.25'),
                                 Text(
                                   '${_rate.toStringAsFixed(2)}x',
                                   style: TextStyle(
@@ -841,7 +856,7 @@ class _RemoteControlState extends State<RemoteControl> {
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                Text('4.00')
+                                const Text('4.00')
                               ],
                             ),
                             SliderTheme(
@@ -886,7 +901,7 @@ class _RemoteControlState extends State<RemoteControl> {
                               color: Colors.grey.shade200,
                               child: IconButton(
                                 color: Colors.black,
-                                icon: Icon(Icons.keyboard_arrow_up),
+                                icon: const Icon(Icons.keyboard_arrow_up),
                                 onPressed: _rate < 4.0
                                     ? () {
                                         _incrementRate(setState);
@@ -904,7 +919,7 @@ class _RemoteControlState extends State<RemoteControl> {
                               color: Colors.grey.shade200,
                               child: IconButton(
                                 color: Colors.black,
-                                icon: Icon(Icons.keyboard_arrow_down),
+                                icon: const Icon(Icons.keyboard_arrow_down),
                                 onPressed: _rate > 0.25
                                     ? () {
                                         _decrementRate(setState);
@@ -938,7 +953,7 @@ class _RemoteControlState extends State<RemoteControl> {
   /// playlist contents become non-scrollable.
   _showAddMediaButtonIfNotScrollable() {
     if (!_showAddMediaButton &&
-        _scrollController?.position?.maxScrollExtent == 0.0) {
+        _scrollController.position.maxScrollExtent == 0.0) {
       setState(() {
         _showAddMediaButton = true;
       });
@@ -1011,12 +1026,10 @@ class _RemoteControlState extends State<RemoteControl> {
     _scheduleSingleUpdate();
   }
 
-  _toggleVolumeControls([bool show]) {
-    if (show == null) {
-      show = !_showVolumeControls;
-    }
+  _toggleVolumeControls([bool? show]) {
+    show ??= !_showVolumeControls;
     setState(() {
-      _showVolumeControls = show;
+      _showVolumeControls = show!;
       _animatingVolumeControls = true;
     });
     if (show == true) {
@@ -1032,7 +1045,7 @@ class _RemoteControlState extends State<RemoteControl> {
       _setVolumePercent(0);
     } else {
       _setVolumePercent(_preMuteVolume != null
-          ? _preMuteVolume / volumeSliderScaleFactor
+          ? _preMuteVolume! / volumeSliderScaleFactor
           : 100);
     }
     if (_showVolumeControls) {
@@ -1041,8 +1054,9 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _cancelHidingVolumeControls() {
-    if (_hideVolumeControlsTimer != null && _hideVolumeControlsTimer.isActive) {
-      _hideVolumeControlsTimer.cancel();
+    if (_hideVolumeControlsTimer != null &&
+        _hideVolumeControlsTimer!.isActive) {
+      _hideVolumeControlsTimer!.cancel();
       _hideVolumeControlsTimer = null;
     }
   }
@@ -1153,7 +1167,7 @@ class _RemoteControlState extends State<RemoteControl> {
   }
 
   _openMedia() async {
-    BrowseResult result = await Navigator.push(
+    BrowseResult? result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => OpenMedia(
@@ -1186,24 +1200,23 @@ class _RemoteControlState extends State<RemoteControl> {
             Material(
               color: _headerFooterBgColor,
               child: ListTile(
-                contentPadding: EdgeInsets.only(left: 14),
+                contentPadding: const EdgeInsets.only(left: 14),
                 dense: widget.settings.dense,
                 title: Text(
                   _playing == null && _title.isEmpty
-                      ? 'Remote Control for VLC 1.4.3'
+                      ? 'Remote Control for VLC 1.5.0'
                       : _playing?.title ??
                           cleanVideoTitle(_title.split(RegExp(r'[\\/]')).last),
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Visibility(
-                      visible:
-                          _pollingTicker == null || !_pollingTicker.isActive,
+                      visible: !_pollingTicker.isActive,
                       child: IconButton(
-                        icon: Icon(Icons.refresh),
+                        icon: const Icon(Icons.refresh),
                         onPressed: _updateStatusAndPlaylist,
                         tooltip: 'Refresh VLC status',
                       ),
@@ -1216,7 +1229,7 @@ class _RemoteControlState extends State<RemoteControl> {
                           color: _equalizer?.enabled == true
                               ? theme.primaryColor
                               : null,
-                          icon: Icon(Icons.equalizer),
+                          icon: const Icon(Icons.equalizer),
                           onPressed: _showEqualizer,
                         ),
                       ),
@@ -1230,13 +1243,13 @@ class _RemoteControlState extends State<RemoteControl> {
                             PopupMenuItem(
                               child: ListTile(
                                 dense: widget.settings.dense,
-                                leading: Icon(Icons.subtitles),
-                                title: Text('Subtitle track'),
+                                leading: const Icon(Icons.subtitles),
+                                title: const Text('Subtitle track'),
                                 enabled:
                                     (_lastStatusResponse?.subtitleTracks ?? [])
                                         .isNotEmpty,
                               ),
-                              value: _PopupMenuChoice.SUBTITLE_TRACK,
+                              value: _PopupMenuChoice.subtitleTrack,
                               enabled:
                                   (_lastStatusResponse?.subtitleTracks ?? [])
                                       .isNotEmpty,
@@ -1244,14 +1257,14 @@ class _RemoteControlState extends State<RemoteControl> {
                             PopupMenuItem(
                               child: ListTile(
                                 dense: widget.settings.dense,
-                                leading: Icon(Icons.audiotrack),
-                                title: Text('Audio track'),
+                                leading: const Icon(Icons.audiotrack),
+                                title: const Text('Audio track'),
                                 enabled:
                                     (_lastStatusResponse?.audioTracks ?? [])
                                             .length >
                                         1,
                               ),
-                              value: _PopupMenuChoice.AUDIO_TRACK,
+                              value: _PopupMenuChoice.audioTrack,
                               enabled: (_lastStatusResponse?.audioTracks ?? [])
                                       .length >
                                   1,
@@ -1260,54 +1273,55 @@ class _RemoteControlState extends State<RemoteControl> {
                               child: ListTile(
                                 dense: widget.settings.dense,
                                 leading: Icon(Icons.fullscreen,
-                                    color: _lastStatusResponse.fullscreen
+                                    color: _lastStatusResponse != null &&
+                                            _lastStatusResponse!.fullscreen
                                         ? theme.primaryColor
                                         : null),
-                                title: Text('Fullscreen'),
+                                title: const Text('Fullscreen'),
                                 enabled: _playing != null &&
-                                    (_playing.isVideo || _playing.isWeb),
+                                    (_playing!.isVideo || _playing!.isWeb),
                               ),
-                              value: _PopupMenuChoice.FULLSCREEN,
+                              value: _PopupMenuChoice.fullscreen,
                               enabled: _playing != null &&
-                                  (_playing.isVideo || _playing.isWeb),
+                                  (_playing!.isVideo || _playing!.isWeb),
                             ),
                             PopupMenuItem(
                               child: ListTile(
                                 dense: widget.settings.dense,
-                                leading: Icon(Icons.image),
-                                title: Text('Take snapshot'),
+                                leading: const Icon(Icons.image),
+                                title: const Text('Take snapshot'),
                                 enabled: _playing != null &&
-                                    (_playing.isVideo || _playing.isWeb),
+                                    (_playing!.isVideo || _playing!.isWeb),
                               ),
-                              value: _PopupMenuChoice.SNAPSHOT,
+                              value: _PopupMenuChoice.snapshot,
                               enabled: _playing != null &&
-                                  (_playing.isVideo || _playing.isWeb),
+                                  (_playing!.isVideo || _playing!.isWeb),
                             ),
                             PopupMenuItem(
                               child: ListTile(
                                 dense: widget.settings.dense,
-                                leading: Icon(Icons.directions_run),
-                                title: Text('Playback speed'),
+                                leading: const Icon(Icons.directions_run),
+                                title: const Text('Playback speed'),
                               ),
-                              value: _PopupMenuChoice.PLAYBACK_SPEED,
+                              value: _PopupMenuChoice.playbackSpeed,
                             ),
                             PopupMenuItem(
                               child: ListTile(
                                 dense: widget.settings.dense,
-                                leading: Icon(Icons.clear),
-                                title: Text('Clear playlist'),
+                                leading: const Icon(Icons.clear),
+                                title: const Text('Clear playlist'),
                               ),
-                              value: _PopupMenuChoice.EMPTY_PLAYLIST,
+                              value: _PopupMenuChoice.emptyPlaylist,
                               enabled: _lastStatusResponse != null,
                             ),
-                            PopupMenuDivider(),
+                            const PopupMenuDivider(),
                             PopupMenuItem(
                               child: ListTile(
                                 dense: widget.settings.dense,
-                                leading: Icon(Icons.settings),
+                                leading: const Icon(Icons.settings),
                                 title: Text(intl('Settings')),
                               ),
-                              value: _PopupMenuChoice.SETTINGS,
+                              value: _PopupMenuChoice.settings,
                               enabled: _lastStatusResponse != null,
                             ),
                           ];
@@ -1318,10 +1332,10 @@ class _RemoteControlState extends State<RemoteControl> {
                 ),
               ),
             ),
-            Divider(height: 0),
+            const Divider(height: 0),
             _buildMainContent(),
             if (!_showVolumeControls && !_animatingVolumeControls)
-              Divider(height: 0),
+              const Divider(height: 0),
             _buildFooter(),
           ],
         ),
@@ -1331,27 +1345,29 @@ class _RemoteControlState extends State<RemoteControl> {
 
   Widget _buildMainContent() {
     final theme = Theme.of(context);
-    final headingStyle = theme.textTheme.subtitle1
+    final headingStyle = theme.textTheme.subtitle1!
         .copyWith(fontWeight: FontWeight.bold, color: theme.primaryColor);
     if (!widget.settings.connection.hasIp) {
       return Expanded(
-        child: ListView(padding: EdgeInsets.all(16), children: [
+        child: ListView(padding: const EdgeInsets.all(16), children: [
           Text('Remote Control for VLC Setup',
               style: theme.textTheme.headline5),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text('1. VLC configuration', style: headingStyle),
-            SizedBox(height: 8),
-            Text(
+            const SizedBox(height: 8),
+            const Text(
                 'A step-by-step guide to enabling VLC\'s web interface for remote control:'),
-            SizedBox(height: 8),
-            RaisedButton(
-              color: theme.buttonTheme.colorScheme.primary,
-              textColor: Colors.white,
+            const SizedBox(height: 8),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                primary: theme.buttonTheme.colorScheme!.primary,
+                onPrimary: Colors.white,
+              ),
               onPressed: _showConfigurationGuide,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
+                children: const <Widget>[
                   Icon(Icons.traffic),
                   SizedBox(width: 8.0),
                   Text('VLC Configuration Guide'),
@@ -1359,24 +1375,26 @@ class _RemoteControlState extends State<RemoteControl> {
               ),
             ),
           ]),
-          Divider(height: 48, color: Colors.black87),
+          const Divider(height: 48, color: Colors.black87),
           Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text('2. Automatic connection', style: headingStyle),
-            SizedBox(height: 8),
-            Text(
+            const SizedBox(height: 8),
+            const Text(
                 'Once VLC is configured, scan your local network to try to connect automatically:'),
-            SizedBox(height: 8),
-            RaisedButton(
-              color: theme.buttonTheme.colorScheme.primary,
-              textColor: Colors.white,
+            const SizedBox(height: 8),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                primary: theme.buttonTheme.colorScheme!.primary,
+                onPrimary: Colors.white,
+              ),
               onPressed: !_autoConnecting ? _autoConnect : null,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   !_autoConnecting
-                      ? Icon(Icons.computer)
-                      : Padding(
-                          padding: const EdgeInsets.all(4.0),
+                      ? const Icon(Icons.computer)
+                      : const Padding(
+                          padding: EdgeInsets.all(4.0),
                           child: SizedBox(
                             width: 16,
                             height: 16,
@@ -1386,8 +1404,8 @@ class _RemoteControlState extends State<RemoteControl> {
                             ),
                           ),
                         ),
-                  SizedBox(width: 8.0),
-                  Text('Scan Network for VLC'),
+                  const SizedBox(width: 8.0),
+                  const Text('Scan Network for VLC'),
                 ],
               ),
             ),
@@ -1395,37 +1413,39 @@ class _RemoteControlState extends State<RemoteControl> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 dense: widget.settings.dense,
-                leading: Icon(
+                leading: const Icon(
                   Icons.check,
                   color: Colors.green,
                 ),
-                title: Text(_autoConnectHost),
+                title: Text(_autoConnectHost!),
               ),
             if (_autoConnectError != null)
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 dense: widget.settings.dense,
-                leading: Icon(
+                leading: const Icon(
                   Icons.error,
                   color: Colors.redAccent,
                 ),
-                title: Text(_autoConnectError),
+                title: Text(_autoConnectError!),
               )
           ]),
-          Divider(height: 48, color: Colors.black87),
+          const Divider(height: 48, color: Colors.black87),
           Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text('3. Manual connection', style: headingStyle),
-            SizedBox(height: 8),
-            Text(
+            const SizedBox(height: 8),
+            const Text(
                 'If automatic connection doesn\'t work, manually configure connection details:'),
-            SizedBox(height: 8),
-            RaisedButton(
-              color: theme.buttonTheme.colorScheme.primary,
-              textColor: Colors.white,
+            const SizedBox(height: 8),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                primary: theme.buttonTheme.colorScheme!.primary,
+                onPrimary: Colors.white,
+              ),
               onPressed: _showSettings,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
+                children: const <Widget>[
                   Icon(Icons.settings),
                   SizedBox(width: 8.0),
                   Text('Configure VLC Connection'),
@@ -1442,7 +1462,7 @@ class _RemoteControlState extends State<RemoteControl> {
         children: [
           if (widget.settings.blurredCoverBg &&
               _playing != null &&
-              _playing.isAudio &&
+              _playing!.isAudio &&
               _backgroundArtUrl != null)
             Positioned.fill(
               child: Opacity(
@@ -1515,7 +1535,7 @@ class _RemoteControlState extends State<RemoteControl> {
           if (_playlist.isEmpty)
             Positioned.fill(
               child: Padding(
-                padding: EdgeInsets.all(32),
+                padding: const EdgeInsets.all(32),
                 child: _lastPlaylistResponseCode == 200
                     ? Center(
                         child: Column(
@@ -1525,9 +1545,9 @@ class _RemoteControlState extends State<RemoteControl> {
                               widthFactor: 0.75,
                               child: Image.asset('assets/icon-512.png'),
                             ),
-                            SizedBox(height: 16),
+                            const SizedBox(height: 16),
                             Text(
-                                'Connected to VLC ${_lastStatusResponse?.version ?? ''}'),
+                                'Connected to VLC ${_lastStatusResponse?.version}'),
                           ],
                         ),
                       )
@@ -1537,14 +1557,14 @@ class _RemoteControlState extends State<RemoteControl> {
           Positioned(
             right: 16,
             bottom: 16,
-            child: TweenAnimationBuilder(
+            child: TweenAnimationBuilder<double>(
               tween: Tween<double>(begin: 0, end: _showFab ? 1 : 0),
-              duration: Duration(milliseconds: 250),
+              duration: const Duration(milliseconds: 250),
               curve: _showFab ? Curves.easeOut : Curves.easeIn,
               builder: (context, scale, child) => ScaleTransition(
                 scale: AlwaysStoppedAnimation<double>(scale),
                 child: FloatingActionButton(
-                  child: Icon(
+                  child: const Icon(
                     Icons.eject,
                     color: Colors.white,
                   ),
@@ -1556,12 +1576,12 @@ class _RemoteControlState extends State<RemoteControl> {
           Positioned.fill(
             child: Column(
               children: <Widget>[
-                Spacer(),
-                TweenAnimationBuilder(
+                const Spacer(),
+                TweenAnimationBuilder<Offset>(
                   tween: Tween<Offset>(
-                      begin: Offset(0, 1),
+                      begin: const Offset(0, 1),
                       end: Offset(0, _showVolumeControls ? 0 : 1)),
-                  duration: Duration(milliseconds: 250),
+                  duration: const Duration(milliseconds: 250),
                   curve: _showVolumeControls ? Curves.easeOut : Curves.easeIn,
                   onEnd: () {
                     setState(() {
@@ -1585,15 +1605,15 @@ class _RemoteControlState extends State<RemoteControl> {
   Widget _buildBackgroundImage() {
     if (_reusingBackgroundArt) {
       return Image(
-        image: NetworkImage(_backgroundArtUrl, headers: _authHeaders),
+        image: NetworkImage(_backgroundArtUrl!, headers: _authHeaders),
         gaplessPlayback: true,
         fit: BoxFit.cover,
       );
     }
     return FadeInImage(
-      imageErrorBuilder: (_, __, ___) => SizedBox(),
+      imageErrorBuilder: (_, __, ___) => const SizedBox(),
       placeholder: MemoryImage(kTransparentImage),
-      image: NetworkImage(_backgroundArtUrl, headers: _authHeaders),
+      image: NetworkImage(_backgroundArtUrl!, headers: _authHeaders),
       fit: BoxFit.cover,
     );
   }
@@ -1601,17 +1621,17 @@ class _RemoteControlState extends State<RemoteControl> {
   Widget _buildVolumeControls() {
     return Column(
       children: <Widget>[
-        Divider(height: 0),
+        const Divider(height: 0),
         Container(
           color: _headerFooterBgColor,
-          padding: EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Material(
             color: Colors.transparent,
             child: Row(
               children: <Widget>[
                 // Volume down
                 IconButton(
-                  icon: Icon(Icons.remove),
+                  icon: const Icon(Icons.remove),
                   tooltip: 'Decrease volume',
                   onPressed: _volume > 0
                       ? () {
@@ -1661,7 +1681,7 @@ class _RemoteControlState extends State<RemoteControl> {
                 ),
                 // Volume up
                 IconButton(
-                  icon: Icon(Icons.add),
+                  icon: const Icon(Icons.add),
                   tooltip: 'Increase volume',
                   onPressed: _volume < 512
                       ? () {
@@ -1691,7 +1711,7 @@ class _RemoteControlState extends State<RemoteControl> {
         child: Column(
           children: <Widget>[
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
               child: Row(
                 children: <Widget>[
                   Builder(
@@ -1703,7 +1723,7 @@ class _RemoteControlState extends State<RemoteControl> {
                         _state != 'stopped' ? formatTime(_time) : '––:––',
                         style: TextStyle(
                           color: _pollingTicker.isActive
-                              ? theme.textTheme.bodyText2.color
+                              ? theme.textTheme.bodyText2!.color
                               : theme.disabledColor,
                         ),
                       ),
@@ -1745,7 +1765,7 @@ class _RemoteControlState extends State<RemoteControl> {
                           : '––:––',
                     ),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Builder(
                     builder: (context) => GestureDetector(
                       onTap: _toggleVolumeControls,
@@ -1766,7 +1786,8 @@ class _RemoteControlState extends State<RemoteControl> {
               ),
             ),
             Padding(
-              padding: EdgeInsets.only(left: 9, right: 9, bottom: 6, top: 3),
+              padding:
+                  const EdgeInsets.only(left: 9, right: 9, bottom: 6, top: 3),
               child: Row(
                 // mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: <Widget>[
@@ -1780,19 +1801,19 @@ class _RemoteControlState extends State<RemoteControl> {
                     ),
                     onTap: _toggleLooping,
                   ),
-                  Expanded(child: VerticalDivider()),
+                  const Expanded(child: VerticalDivider()),
                   GestureDetector(
-                    child: Icon(
+                    child: const Icon(
                       Icons.skip_previous,
                       color: Colors.black,
                       size: 30,
                     ),
                     onTap: _previous,
                   ),
-                  Expanded(child: VerticalDivider()),
+                  const Expanded(child: VerticalDivider()),
                   // Rewind button
                   GestureDetector(
-                    child: Icon(
+                    child: const Icon(
                       Icons.fast_rewind,
                       color: Colors.black,
                       size: 30,
@@ -1803,17 +1824,17 @@ class _RemoteControlState extends State<RemoteControl> {
                   ),
                   // Play/pause button
                   Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
                     child: GestureDetector(
                       onTap: _pause,
                       onLongPress: _stop,
-                      child: TweenAnimationBuilder(
+                      child: TweenAnimationBuilder<double>(
                         tween: Tween<double>(
                             begin: 0.0,
                             end: _state == 'paused' || _state == 'stopped'
                                 ? 0.0
                                 : 1.0),
-                        duration: Duration(milliseconds: 250),
+                        duration: const Duration(milliseconds: 250),
                         curve: Curves.easeInOut,
                         builder: (context, progress, child) => AnimatedIcon(
                           color: Colors.black,
@@ -1826,7 +1847,7 @@ class _RemoteControlState extends State<RemoteControl> {
                   ),
                   // Fast forward
                   GestureDetector(
-                    child: Icon(
+                    child: const Icon(
                       Icons.fast_forward,
                       color: Colors.black,
                       size: 30,
@@ -1835,16 +1856,16 @@ class _RemoteControlState extends State<RemoteControl> {
                       _seekRelative(10);
                     },
                   ),
-                  Expanded(child: VerticalDivider()),
+                  const Expanded(child: VerticalDivider()),
                   GestureDetector(
-                    child: Icon(
+                    child: const Icon(
                       Icons.skip_next,
                       color: Colors.black,
                       size: 30,
                     ),
                     onTap: _next,
                   ),
-                  Expanded(child: VerticalDivider()),
+                  const Expanded(child: VerticalDivider()),
                   GestureDetector(
                     child: Icon(
                       Icons.shuffle,
@@ -1866,7 +1887,8 @@ class _RemoteControlState extends State<RemoteControl> {
 class ConnectionAnimation extends StatefulWidget {
   final VoidCallback showSettings;
 
-  ConnectionAnimation({this.showSettings});
+  const ConnectionAnimation({Key? key, required this.showSettings})
+      : super(key: key);
 
   @override
   State<StatefulWidget> createState() => _ConnectionAnimationState();
@@ -1874,21 +1896,16 @@ class ConnectionAnimation extends StatefulWidget {
 
 class _ConnectionAnimationState extends State<ConnectionAnimation>
     with TickerProviderStateMixin {
-  AnimationController _controller;
-  Animation<int> _animation;
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2000),
+  )..repeat();
 
-  @override
-  void initState() {
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    )..repeat();
-    _animation = IntTween(begin: 0, end: 3).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
-    ));
-    super.initState();
-  }
+  late final Animation<int> _animation =
+      IntTween(begin: 0, end: 3).animate(CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeInOut,
+  ));
 
   @override
   dispose() {
@@ -1912,7 +1929,7 @@ class _ConnectionAnimationState extends State<ConnectionAnimation>
               ),
               AnimatedBuilder(
                 animation: _animation,
-                builder: (BuildContext context, Widget child) {
+                builder: (BuildContext context, Widget? child) {
                   return FractionallySizedBox(
                     widthFactor: 0.75,
                     child: Image.asset(
@@ -1923,13 +1940,13 @@ class _ConnectionAnimationState extends State<ConnectionAnimation>
               )
             ],
           ),
-          SizedBox(height: 16),
-          Text('Trying to connect to VLC…'),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
+          const Text('Trying to connect to VLC…'),
+          const SizedBox(height: 16),
           IconButton(
-            color: theme.textTheme.caption.color,
+            color: theme.textTheme.caption!.color,
             iconSize: 48,
-            icon: Icon(Icons.settings),
+            icon: const Icon(Icons.settings),
             onPressed: widget.showSettings,
           )
         ],

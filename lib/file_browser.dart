@@ -13,12 +13,13 @@ class FileBrowser extends StatefulWidget {
   final Function(BrowseItem) onToggleFave;
   final Settings settings;
 
-  FileBrowser({
-    @required this.dir,
-    @required this.isFave,
-    @required this.onToggleFave,
-    @required this.settings,
-  });
+  const FileBrowser({
+    Key? key,
+    required this.dir,
+    required this.isFave,
+    required this.onToggleFave,
+    required this.settings,
+  }) : super(key: key);
 
   @override
   State<StatefulWidget> createState() => _FileBrowserState();
@@ -26,8 +27,8 @@ class FileBrowser extends StatefulWidget {
 
 class _FileBrowserState extends State<FileBrowser> {
   bool _loading = false;
-  String _errorMessage;
-  String _errorDetail;
+  String? _errorMessage;
+  String? _errorDetail;
   List<BrowseItem> _items = [];
 
   @override
@@ -58,7 +59,7 @@ class _FileBrowserState extends State<FileBrowser> {
               base64Encode(
                   utf8.encode(':${widget.settings.connection.password}')),
         },
-      ).timeout(Duration(seconds: 2));
+      ).timeout(const Duration(seconds: 2));
     } catch (e) {
       setState(() {
         _errorMessage = 'Error connecting to VLC';
@@ -72,13 +73,13 @@ class _FileBrowserState extends State<FileBrowser> {
     List<BrowseItem> files = [];
 
     if (response.statusCode == 200) {
-      var document = xml.parse(utf8.decode(response.bodyBytes));
+      var document = xml.XmlDocument.parse(utf8.decode(response.bodyBytes));
       document.findAllElements('element').forEach((el) {
         var item = BrowseItem(
-          el.getAttribute('type'),
-          el.getAttribute('name'),
-          el.getAttribute('path'),
-          el.getAttribute('uri'),
+          el.getAttribute('type') ?? '',
+          el.getAttribute('name') ?? '',
+          el.getAttribute('path') ?? '',
+          el.getAttribute('uri') ?? '',
         );
 
         if (item.name == '..') {
@@ -87,7 +88,7 @@ class _FileBrowserState extends State<FileBrowser> {
 
         if (item.isDir) {
           dirs.add(item);
-        } else if (item.isSupportedMedia) {
+        } else if (item.isSupportedMedia || item.isPlaylist) {
           files.add(item);
         }
       });
@@ -108,7 +109,7 @@ class _FileBrowserState extends State<FileBrowser> {
 
   _handleTap(BrowseItem item) async {
     if (item.isDir) {
-      BrowseResult result = await Navigator.push(
+      BrowseResult? result = await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => FileBrowser(
@@ -157,7 +158,7 @@ class _FileBrowserState extends State<FileBrowser> {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[CircularProgressIndicator()],
+          children: const <Widget>[CircularProgressIndicator()],
         ),
       );
     }
@@ -168,13 +169,13 @@ class _FileBrowserState extends State<FileBrowser> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             ListTile(
-              leading: Icon(
+              leading: const Icon(
                 Icons.error,
                 color: Colors.redAccent,
                 size: 48,
               ),
-              title: Text(_errorMessage),
-              subtitle: Text(_errorDetail),
+              title: Text(_errorMessage!),
+              subtitle: Text(_errorDetail!),
             ),
           ],
         ),
@@ -185,7 +186,7 @@ class _FileBrowserState extends State<FileBrowser> {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[Text('No compatible files found')],
+          children: const <Widget>[Text('No compatible files found')],
         ),
       );
     }
@@ -212,9 +213,9 @@ class _FileBrowserState extends State<FileBrowser> {
           if (_items[i].isDir &&
               i < _items.length - 1 &&
               _items[i + 1].isFile) {
-            return Divider();
+            return const Divider();
           }
-          return SizedBox.shrink();
+          return const SizedBox.shrink();
         },
       ),
     );

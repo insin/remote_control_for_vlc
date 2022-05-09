@@ -11,7 +11,7 @@ The first time you start Remote Control for VLC, it will provide a guide to sett
 The app's guides for initial VLC configuration and finding your host IP if it can't be found
  automatically are also available here if you need to reference them on a computer:
 
-### [Remote Control for VLC Configuration Guides](https://codepen.io/jbscript/full/BaoVYYK)
+### [Remote Control for VLC Configuration Guides](https://insin.github.io/remote-control-for-vlc/)
 
 ## Demo
 
