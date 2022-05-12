@@ -7,7 +7,7 @@ class HostIpGuide extends StatefulWidget {
   const HostIpGuide({Key? key}) : super(key: key);
 
   @override
-  _HostIpGuideState createState() => _HostIpGuideState();
+  State<HostIpGuide> createState() => _HostIpGuideState();
 }
 
 class _HostIpGuideState extends State<HostIpGuide> {

@@ -55,9 +55,8 @@ class _FileBrowserState extends State<FileBrowser> {
           'uri': dir.uri,
         }),
         headers: {
-          'Authorization': 'Basic ' +
-              base64Encode(
-                  utf8.encode(':${widget.settings.connection.password}')),
+          'Authorization':
+              'Basic ${base64Encode(utf8.encode(':${widget.settings.connection.password}'))}',
         },
       ).timeout(const Duration(seconds: 2));
     } catch (e) {
@@ -121,7 +120,9 @@ class _FileBrowserState extends State<FileBrowser> {
         ),
       );
       if (result != null) {
-        Navigator.pop(context, result);
+        if (mounted) {
+          Navigator.pop(context, result);
+        }
       }
     } else {
       Navigator.pop(context, BrowseResult(item, BrowseResultIntent.play));

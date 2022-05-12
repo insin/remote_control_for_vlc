@@ -164,7 +164,9 @@ class _RemoteControlState extends State<RemoteControl> {
   _checkWifi() async {
     var connectivityResult = await Connectivity().checkConnectivity();
     if (connectivityResult != ConnectivityResult.wifi) {
-      _showWifiAlert(context);
+      if (mounted) {
+        _showWifiAlert(context);
+      }
     }
   }
 
@@ -189,8 +191,8 @@ class _RemoteControlState extends State<RemoteControl> {
 
   //#region HTTP requests
   get _authHeaders => {
-        'Authorization': 'Basic ' +
-            base64Encode(utf8.encode(':${widget.settings.connection.password}'))
+        'Authorization':
+            'Basic ${base64Encode(utf8.encode(':${widget.settings.connection.password}'))}'
       };
 
   String _artUrlForPlid(String plid) =>
@@ -389,7 +391,7 @@ class _RemoteControlState extends State<RemoteControl> {
         _reusingBackgroundArt = false;
       }
       if (playlistResponse.items.length < _playlist.length) {
-        SchedulerBinding.instance?.addPostFrameCallback((timeStamp) {
+        SchedulerBinding.instance.addPostFrameCallback((timeStamp) {
           _showAddMediaButtonIfNotScrollable();
         });
       }
@@ -532,7 +534,7 @@ class _RemoteControlState extends State<RemoteControl> {
           ),
           headers: {
             'Authorization':
-                'Basic ' + base64Encode(utf8.encode(':$defaultPassword'))
+                'Basic ${base64Encode(utf8.encode(':$defaultPassword'))}'
           }).timeout(const Duration(seconds: 1));
     } catch (e) {
       setState(() {
@@ -1241,6 +1243,10 @@ class _RemoteControlState extends State<RemoteControl> {
                         itemBuilder: (context) {
                           return [
                             PopupMenuItem(
+                              value: _PopupMenuChoice.subtitleTrack,
+                              enabled:
+                                  (_lastStatusResponse?.subtitleTracks ?? [])
+                                      .isNotEmpty,
                               child: ListTile(
                                 dense: widget.settings.dense,
                                 leading: const Icon(Icons.subtitles),
@@ -1249,12 +1255,12 @@ class _RemoteControlState extends State<RemoteControl> {
                                     (_lastStatusResponse?.subtitleTracks ?? [])
                                         .isNotEmpty,
                               ),
-                              value: _PopupMenuChoice.subtitleTrack,
-                              enabled:
-                                  (_lastStatusResponse?.subtitleTracks ?? [])
-                                      .isNotEmpty,
                             ),
                             PopupMenuItem(
+                              value: _PopupMenuChoice.audioTrack,
+                              enabled: (_lastStatusResponse?.audioTracks ?? [])
+                                      .length >
+                                  1,
                               child: ListTile(
                                 dense: widget.settings.dense,
                                 leading: const Icon(Icons.audiotrack),
@@ -1264,12 +1270,11 @@ class _RemoteControlState extends State<RemoteControl> {
                                             .length >
                                         1,
                               ),
-                              value: _PopupMenuChoice.audioTrack,
-                              enabled: (_lastStatusResponse?.audioTracks ?? [])
-                                      .length >
-                                  1,
                             ),
                             PopupMenuItem(
+                              value: _PopupMenuChoice.fullscreen,
+                              enabled: _playing != null &&
+                                  (_playing!.isVideo || _playing!.isWeb),
                               child: ListTile(
                                 dense: widget.settings.dense,
                                 leading: Icon(Icons.fullscreen,
@@ -1281,11 +1286,11 @@ class _RemoteControlState extends State<RemoteControl> {
                                 enabled: _playing != null &&
                                     (_playing!.isVideo || _playing!.isWeb),
                               ),
-                              value: _PopupMenuChoice.fullscreen,
-                              enabled: _playing != null &&
-                                  (_playing!.isVideo || _playing!.isWeb),
                             ),
                             PopupMenuItem(
+                              value: _PopupMenuChoice.snapshot,
+                              enabled: _playing != null &&
+                                  (_playing!.isVideo || _playing!.isWeb),
                               child: ListTile(
                                 dense: widget.settings.dense,
                                 leading: const Icon(Icons.image),
@@ -1293,36 +1298,33 @@ class _RemoteControlState extends State<RemoteControl> {
                                 enabled: _playing != null &&
                                     (_playing!.isVideo || _playing!.isWeb),
                               ),
-                              value: _PopupMenuChoice.snapshot,
-                              enabled: _playing != null &&
-                                  (_playing!.isVideo || _playing!.isWeb),
                             ),
                             PopupMenuItem(
+                              value: _PopupMenuChoice.playbackSpeed,
                               child: ListTile(
                                 dense: widget.settings.dense,
                                 leading: const Icon(Icons.directions_run),
                                 title: const Text('Playback speed'),
                               ),
-                              value: _PopupMenuChoice.playbackSpeed,
                             ),
                             PopupMenuItem(
+                              value: _PopupMenuChoice.emptyPlaylist,
+                              enabled: _lastStatusResponse != null,
                               child: ListTile(
                                 dense: widget.settings.dense,
                                 leading: const Icon(Icons.clear),
                                 title: const Text('Clear playlist'),
                               ),
-                              value: _PopupMenuChoice.emptyPlaylist,
-                              enabled: _lastStatusResponse != null,
                             ),
                             const PopupMenuDivider(),
                             PopupMenuItem(
+                              value: _PopupMenuChoice.settings,
+                              enabled: _lastStatusResponse != null,
                               child: ListTile(
                                 dense: widget.settings.dense,
                                 leading: const Icon(Icons.settings),
                                 title: Text(intl('Settings')),
                               ),
-                              value: _PopupMenuChoice.settings,
-                              enabled: _lastStatusResponse != null,
                             ),
                           ];
                         },
@@ -1564,11 +1566,11 @@ class _RemoteControlState extends State<RemoteControl> {
               builder: (context, scale, child) => ScaleTransition(
                 scale: AlwaysStoppedAnimation<double>(scale),
                 child: FloatingActionButton(
+                  onPressed: _openMedia,
                   child: const Icon(
                     Icons.eject,
                     color: Colors.white,
                   ),
-                  onPressed: _openMedia,
                 ),
               ),
             ),
@@ -1760,7 +1762,7 @@ class _RemoteControlState extends State<RemoteControl> {
                     child: Text(
                       _state != 'stopped' && _length != Duration.zero
                           ? _showTimeLeft
-                              ? '-' + formatTime(_length - _time)
+                              ? '-${formatTime(_length - _time)}'
                               : formatTime(_length)
                           : '––:––',
                     ),
@@ -1792,6 +1794,7 @@ class _RemoteControlState extends State<RemoteControl> {
                 // mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: <Widget>[
                   GestureDetector(
+                    onTap: _toggleLooping,
                     child: Icon(
                       _repeat ? Icons.repeat_one : Icons.repeat,
                       color: _repeat || _loop
@@ -1799,16 +1802,15 @@ class _RemoteControlState extends State<RemoteControl> {
                           : theme.disabledColor,
                       size: 30,
                     ),
-                    onTap: _toggleLooping,
                   ),
                   const Expanded(child: VerticalDivider()),
                   GestureDetector(
+                    onTap: _previous,
                     child: const Icon(
                       Icons.skip_previous,
                       color: Colors.black,
                       size: 30,
                     ),
-                    onTap: _previous,
                   ),
                   const Expanded(child: VerticalDivider()),
                   // Rewind button
@@ -1858,21 +1860,21 @@ class _RemoteControlState extends State<RemoteControl> {
                   ),
                   const Expanded(child: VerticalDivider()),
                   GestureDetector(
+                    onTap: _next,
                     child: const Icon(
                       Icons.skip_next,
                       color: Colors.black,
                       size: 30,
                     ),
-                    onTap: _next,
                   ),
                   const Expanded(child: VerticalDivider()),
                   GestureDetector(
+                    onTap: _toggleRandom,
                     child: Icon(
                       Icons.shuffle,
                       color: _random ? theme.primaryColor : theme.disabledColor,
                       size: 30,
                     ),
-                    onTap: _toggleRandom,
                   ),
                 ],
               ),

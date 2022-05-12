@@ -136,7 +136,7 @@ String dotsToSpaces(String s, {bool keepExt = false}) {
   if (keepExt) {
     ext = parts.removeLast();
   }
-  return parts.join(' ') + '.$ext';
+  return '${parts.join(' ')}.$ext';
 }
 
 /// [Iterable.firstWhere] doesn't work with null safety when you want to fall
@@ -153,7 +153,7 @@ T? firstWhereOrNull<T>(Iterable<T> iterable, bool Function(T element) test) {
 String formatTime(Duration duration) {
   String minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
   String seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
-  return '${duration.inHours >= 1 ? duration.inHours.toString() + ':' : ''}$minutes:$seconds';
+  return '${duration.inHours >= 1 ? '${duration.inHours}:' : ''}$minutes:$seconds';
 }
 
 /// Matches some of the protocols supported by VLC.

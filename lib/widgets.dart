@@ -14,7 +14,7 @@ class EnqueueMenuGestureDetector extends StatefulWidget {
       : super(key: key);
 
   @override
-  _EnqueueMenuGestureDetectorState createState() =>
+  State<EnqueueMenuGestureDetector> createState() =>
       _EnqueueMenuGestureDetectorState();
 }
 
@@ -32,19 +32,21 @@ class _EnqueueMenuGestureDetectorState
       context: context,
       items: <PopupMenuItem<BrowseResultIntent>>[
         const PopupMenuItem(
-          child: Text('Play'),
           value: BrowseResultIntent.play,
+          child: Text('Play'),
         ),
         const PopupMenuItem(
-          child: Text('Enqueue'),
           value: BrowseResultIntent.enqueue,
+          child: Text('Enqueue'),
         ),
       ],
       position: RelativeRect.fromRect(
           _tapPosition & const Size(40, 40), Offset.zero & size),
     );
     if (intent != null) {
-      Navigator.pop(context, BrowseResult(widget.item, intent));
+      if (mounted) {
+        Navigator.pop(context, BrowseResult(widget.item, intent));
+      }
     }
   }
 

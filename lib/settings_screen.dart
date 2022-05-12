@@ -149,8 +149,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             '/requests/status.xml',
           ),
           headers: {
-            'Authorization': 'Basic ' +
-                base64Encode(utf8.encode(':${passwordController.text}'))
+            'Authorization':
+                'Basic ${base64Encode(utf8.encode(':${passwordController.text}'))}'
           }).timeout(const Duration(seconds: 2));
 
       if (response.statusCode == 200) {

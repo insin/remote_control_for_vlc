@@ -7,7 +7,7 @@ class VlcConfigurationGuide extends StatefulWidget {
   const VlcConfigurationGuide({Key? key}) : super(key: key);
 
   @override
-  _VlcConfigurationGuideState createState() => _VlcConfigurationGuideState();
+  State<VlcConfigurationGuide> createState() => _VlcConfigurationGuideState();
 }
 
 class _VlcConfigurationGuideState extends State<VlcConfigurationGuide> {

@@ -47,13 +47,13 @@ class _OpenMediaState extends State<OpenMedia> with WidgetsBindingObserver {
         .map((obj) => BrowseItem.fromJson(obj))
         .toList();
     super.initState();
-    WidgetsBinding.instance!.addObserver(this);
+    WidgetsBinding.instance.addObserver(this);
     _checkClipboard();
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance!.removeObserver(this);
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -119,7 +119,9 @@ class _OpenMediaState extends State<OpenMedia> with WidgetsBindingObserver {
       ),
     );
     if (result != null) {
-      Navigator.pop(context, result);
+      if (mounted) {
+        Navigator.pop(context, result);
+      }
     }
   }
 

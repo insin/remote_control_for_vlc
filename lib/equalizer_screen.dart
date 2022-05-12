@@ -47,7 +47,7 @@ class EqualizerScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _EqualizerScreenState createState() => _EqualizerScreenState();
+  State<EqualizerScreen> createState() => _EqualizerScreenState();
 }
 
 class _EqualizerScreenState extends State<EqualizerScreen> {
@@ -128,7 +128,9 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
   _toggleEnabled(enabled) async {
     Equalizer? equalizer = await widget.onToggleEnabled(enabled);
     if (equalizer == null) {
-      Navigator.pop(context);
+      if (mounted) {
+        Navigator.pop(context);
+      }
       return;
     }
     setState(() {
@@ -159,7 +161,9 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
     });
     var equalizer = await widget.onPresetChange(preset.id);
     if (equalizer == null) {
-      Navigator.pop(context);
+      if (mounted) {
+        Navigator.pop(context);
+      }
       return;
     }
     setState(() {
@@ -170,7 +174,9 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
   _onPreampChanged(preamp) async {
     var equalizer = await widget.onPreampChange(_decibelsToString(preamp));
     if (equalizer == null) {
-      Navigator.pop(context);
+      if (mounted) {
+        Navigator.pop(context);
+      }
       return;
     }
     setState(() {
